@@ -21,6 +21,7 @@ const translations = {
         newScenario: 'Новый сценарий',
         save: 'Сохранить',
         cancel: 'Отмена',
+        paste: 'Вставить из буфера',
         editorPlaceholder: 'YAML + Ink код сценария...',
 
         // Settings
@@ -62,6 +63,7 @@ const translations = {
         newScenario: 'New scenario',
         save: 'Save',
         cancel: 'Cancel',
+        paste: 'Paste from clipboard',
         editorPlaceholder: 'YAML + Ink scenario code...',
 
         // Settings

@@ -351,20 +351,20 @@ function parseChoice(line) {
     let text = '';
     let target = null;
 
-    // Формат: + [Text] -> target
+    // Формат: + [Text] -> target (в скобках = не показывать как сообщение)
     const bracketMatch = trimmed.match(/^\+\s*\[(.*?)\]\s*(?:->\s*(\w+))?$/);
     if (bracketMatch) {
         text = bracketMatch[1].trim();
         target = bracketMatch[2] || null;
-        return { text, target };
+        return { text, target, suppressEcho: true };
     }
 
-    // Формат: + Text -> target (без скобок)
+    // Формат: + Text -> target (без скобок = показывать как сообщение)
     const simpleMatch = trimmed.match(/^\+\s*(.*?)\s*(?:->\s*(\w+))?$/);
     if (simpleMatch) {
         text = simpleMatch[1].trim();
         target = simpleMatch[2] || null;
-        return { text, target };
+        return { text, target, suppressEcho: false };
     }
 
     return null;

@@ -39,6 +39,7 @@ class UIController {
             editorClose: document.getElementById('editor-close'),
             editorCancel: document.getElementById('editor-cancel'),
             editorSave: document.getElementById('editor-save'),
+            editorPaste: document.getElementById('editor-paste'),
 
             // Settings Modal
             settingsModal: document.getElementById('settings-modal'),
@@ -111,6 +112,15 @@ class UIController {
         this.elements.editorSave.addEventListener('click', () => {
             const source = this.elements.editorTextarea.value;
             this.callbacks.onEditorSave?.(source);
+        });
+        this.elements.editorPaste.addEventListener('click', async () => {
+            try {
+                const text = await navigator.clipboard.readText();
+                this.elements.editorTextarea.value = text;
+                this.elements.editorTextarea.focus();
+            } catch (e) {
+                console.error('Failed to read clipboard:', e);
+            }
         });
 
         // Settings Modal
@@ -194,6 +204,7 @@ class UIController {
                     <div class="sidebar__item-title">${this._escapeHtml(scenario.title)}</div>
                     <div class="sidebar__item-subtitle">${scenario.isDemo ? 'Demo' : 'Custom'}</div>
                 </div>
+                ${!scenario.isDemo ? `
                 <div class="sidebar__item-actions">
                     <button class="sidebar__item-btn sidebar__item-btn--edit" data-action="edit" aria-label="Edit">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -201,14 +212,13 @@ class UIController {
                             <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
                         </svg>
                     </button>
-                    ${!scenario.isDemo ? `
-                        <button class="sidebar__item-btn sidebar__item-btn--delete" data-action="delete" aria-label="Delete">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-                            </svg>
-                        </button>
-                    ` : ''}
+                    <button class="sidebar__item-btn sidebar__item-btn--delete" data-action="delete" aria-label="Delete">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
                 </div>
+                ` : ''}
             `;
 
             // Клик по элементу (выбор сценария)
@@ -284,7 +294,7 @@ class UIController {
             : '';
 
         const nameHtml = character?.name
-            ? `<div class="message__name" style="color: ${character.color || '#fff'}">${this._escapeHtml(character.name)}</div>`
+            ? `<div class="message__name">${this._escapeHtml(character.name)}</div>`
             : '';
 
         messageEl.innerHTML = `
@@ -472,7 +482,12 @@ class UIController {
      */
     _scrollToBottom() {
         requestAnimationFrame(() => {
-            this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
+            const lastMessage = this.elements.messages.lastElementChild;
+            if (lastMessage) {
+                lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            } else {
+                this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
+            }
         });
     }
 

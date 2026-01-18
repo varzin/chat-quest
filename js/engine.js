@@ -121,7 +121,7 @@ export class InkEngine {
             return {
                 type: textItems.length > 0 ? 'textWithChoices' : 'choices',
                 text: textItems,
-                choices: choices.map(c => ({ text: c.text, target: c.target }))
+                choices: choices.map(c => ({ text: c.text, target: c.target, suppressEcho: c.suppressEcho }))
             };
         }
 

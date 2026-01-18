@@ -1,32 +1,37 @@
 /* ========================================
-   CSS Variables - Dark Theme (iMessage style)
+   CSS Variables - Dark Purple Theme (Modern Chat)
    ======================================== */
 :root {
     /* Colors */
-    --bg-primary: #000000;
-    --bg-secondary: #1c1c1e;
-    --bg-tertiary: #2c2c2e;
-    --bg-message-npc: #3a3a3c;
-    --bg-message-player: #0a84ff;
-    --bg-choice: #3a3a3c;
-    --bg-choice-hover: #4a4a4c;
-    --bg-sidebar: #1c1c1e;
-    --bg-modal: rgba(0, 0, 0, 0.8);
-    --bg-input: #1c1c1e;
+    --bg-primary: #0d0d1a;
+    --bg-secondary: #1a1a2e;
+    --bg-tertiary: #2a2a4a;
+    --bg-message-npc: rgba(60, 60, 80, 0.8);
+    --bg-message-player: #a855f7;
+    --bg-choice: rgba(80, 60, 120, 0.4);
+    --bg-choice-hover: rgba(100, 80, 150, 0.6);
+    --bg-sidebar: #1a1a2e;
+    --bg-modal: rgba(13, 13, 26, 0.9);
+    --bg-input: #1a1a2e;
+
+    /* Gradient backgrounds */
+    --gradient-chat: linear-gradient(180deg, #1a1a2e 0%, #2d1f3d 50%, #1a1a2e 100%);
+    --gradient-player-msg: linear-gradient(135deg, #a855f7 0%, #c026d3 100%);
 
     /* Text */
     --text-primary: #ffffff;
-    --text-secondary: #8e8e93;
-    --text-tertiary: #636366;
-    --text-on-blue: #ffffff;
+    --text-secondary: #a0a0b0;
+    --text-tertiary: #6b6b80;
+    --text-on-player: #ffffff;
 
     /* Accent */
-    --accent-blue: #0a84ff;
+    --accent-purple: #a855f7;
+    --accent-pink: #c026d3;
     --accent-red: #ff453a;
     --accent-green: #30d158;
 
     /* Borders */
-    --border-color: #38383a;
+    --border-color: rgba(100, 80, 150, 0.3);
     --border-radius-sm: 8px;
     --border-radius-md: 16px;
     --border-radius-lg: 20px;
@@ -190,7 +195,7 @@ input, textarea, select {
     width: 44px;
     height: 44px;
     border-radius: var(--border-radius-md);
-    background: var(--accent-blue);
+    background: var(--accent-purple);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -257,7 +262,7 @@ input, textarea, select {
     gap: var(--spacing-sm);
     padding: var(--spacing-md);
     border-radius: var(--border-radius-sm);
-    color: var(--accent-blue);
+    color: var(--accent-purple);
     transition: background var(--transition-fast);
 }
 
@@ -322,7 +327,7 @@ input, textarea, select {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--accent-blue);
+    color: var(--accent-purple);
     border-radius: var(--border-radius-full);
     transition: background var(--transition-fast);
     flex-shrink: 0;
@@ -359,9 +364,12 @@ input, textarea, select {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-md);
+    padding-bottom: calc(var(--spacing-xl) + 60px);
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
+    background: var(--gradient-chat);
+    position: relative;
 }
 
 .message {
@@ -423,6 +431,14 @@ input, textarea, select {
     padding: 0 var(--spacing-sm);
 }
 
+.message--npc .message__name {
+    color: var(--accent-purple);
+}
+
+.message--player .message__name {
+    color: var(--accent-pink);
+}
+
 .message__bubble {
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--border-radius-lg);
@@ -433,11 +449,12 @@ input, textarea, select {
 .message--npc .message__bubble {
     background: var(--bg-message-npc);
     border-bottom-left-radius: var(--spacing-xs);
+    backdrop-filter: blur(10px);
 }
 
 .message--player .message__bubble {
-    background: var(--bg-message-player);
-    color: var(--text-on-blue);
+    background: var(--gradient-player-msg);
+    color: var(--text-on-player);
     border-bottom-right-radius: var(--spacing-xs);
 }
 
@@ -445,11 +462,16 @@ input, textarea, select {
    Typing Indicator
    ======================================== */
 .typing-indicator {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
     display: flex;
     gap: var(--spacing-sm);
-    padding: 0 var(--spacing-md);
-    margin-bottom: var(--spacing-sm);
+    padding: var(--spacing-sm) var(--spacing-md);
+    padding-bottom: var(--spacing-md);
     animation: messageAppear 0.3s ease;
+    pointer-events: none;
 }
 
 .typing-indicator[hidden] {
@@ -479,6 +501,7 @@ input, textarea, select {
     background: var(--bg-message-npc);
     border-radius: var(--border-radius-lg);
     border-bottom-left-radius: var(--spacing-xs);
+    backdrop-filter: blur(10px);
 }
 
 .typing-indicator__dot {
@@ -514,8 +537,7 @@ input, textarea, select {
 .chat__choices {
     padding: var(--spacing-md);
     padding-bottom: calc(var(--spacing-md) + var(--safe-area-bottom));
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border-color);
+    background: linear-gradient(180deg, transparent 0%, var(--bg-secondary) 20%);
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
@@ -531,10 +553,12 @@ input, textarea, select {
     padding: var(--spacing-md);
     background: var(--bg-choice);
     color: var(--text-primary);
-    border-radius: var(--border-radius-md);
+    border-radius: var(--border-radius-lg);
     text-align: left;
     transition: all var(--transition-fast);
     animation: choiceAppear 0.3s ease;
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(10px);
 }
 
 @keyframes choiceAppear {
@@ -550,10 +574,12 @@ input, textarea, select {
 
 .choice-btn:hover {
     background: var(--bg-choice-hover);
+    border-color: var(--accent-purple);
 }
 
 .choice-btn:active {
     transform: scale(0.98);
+    background: var(--accent-purple);
 }
 
 /* ========================================
@@ -678,7 +704,7 @@ input, textarea, select {
 
 .modal__textarea:focus {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--accent-purple);
 }
 
 .modal__textarea::placeholder {
@@ -707,6 +733,15 @@ input, textarea, select {
     border-top: 1px solid var(--border-color);
 }
 
+.modal__footer--spread {
+    justify-content: space-between;
+}
+
+.modal__footer-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
 .modal__btn {
     padding: var(--spacing-sm) var(--spacing-lg);
     border-radius: var(--border-radius-sm);
@@ -715,12 +750,12 @@ input, textarea, select {
 }
 
 .modal__btn--primary {
-    background: var(--accent-blue);
-    color: var(--text-on-blue);
+    background: var(--accent-purple);
+    color: var(--text-on-player);
 }
 
 .modal__btn--primary:hover {
-    background: #0077e6;
+    background: var(--accent-pink);
 }
 
 .modal__btn--secondary {
@@ -739,6 +774,17 @@ input, textarea, select {
 
 .modal__btn--danger:hover {
     background: #e63c32;
+}
+
+.modal__btn--ghost {
+    background: transparent;
+    color: var(--text-secondary);
+    padding: var(--spacing-sm) var(--spacing-md);
+}
+
+.modal__btn--ghost:hover {
+    color: var(--accent-purple);
+    background: rgba(168, 85, 247, 0.1);
 }
 
 /* ========================================
@@ -770,7 +816,7 @@ input, textarea, select {
 
 .settings-item__select:focus {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--accent-purple);
 }
 
 .settings-item__btn {
