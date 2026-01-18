@@ -458,6 +458,15 @@ input, textarea, select {
     border-bottom-right-radius: var(--spacing-xs);
 }
 
+/* Продолжение сообщений от того же отправителя */
+.message--continuation {
+    margin-top: calc(var(--spacing-xs) * -1);
+}
+
+.message--continuation .message__avatar {
+    visibility: hidden;
+}
+
 /* ========================================
    Typing Indicator
    ======================================== */

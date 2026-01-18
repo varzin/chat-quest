@@ -70,6 +70,7 @@ class UIController {
         };
 
         this._confirmResolve = null;
+        this._lastSpeaker = null;
 
         this._bindEvents();
     }
@@ -276,24 +277,30 @@ class UIController {
     clearMessages() {
         this.elements.messages.innerHTML = '';
         this.elements.choices.innerHTML = '';
+        this._lastSpeaker = null;
     }
 
     /**
      * Добавляет сообщение в чат
      * @param {Object} message - { speaker, text, isPlayer }
-     * @param {Object} character - { name, color, avatar }
+     * @param {Object} character - { name, avatar }
      */
     addMessage(message, character) {
         const isPlayer = message.isPlayer;
+        const isNewSpeaker = message.speaker !== this._lastSpeaker;
 
         const messageEl = document.createElement('div');
         messageEl.className = `message message--${isPlayer ? 'player' : 'npc'}`;
+        if (!isNewSpeaker) {
+            messageEl.classList.add('message--continuation');
+        }
 
-        const avatarHtml = character?.avatar
+        // Показываем аватар и имя только для первого сообщения в группе
+        const avatarHtml = isNewSpeaker && character?.avatar
             ? `<img src="${this._escapeHtml(character.avatar)}" alt="">`
             : '';
 
-        const nameHtml = character?.name
+        const nameHtml = isNewSpeaker && character?.name
             ? `<div class="message__name">${this._escapeHtml(character.name)}</div>`
             : '';
 
@@ -306,6 +313,7 @@ class UIController {
         `;
 
         this.elements.messages.appendChild(messageEl);
+        this._lastSpeaker = message.speaker;
         this._scrollToBottom();
     }
 
