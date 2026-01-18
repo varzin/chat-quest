@@ -361,6 +361,13 @@ class UIController {
 
             this.elements.choices.appendChild(btn);
         });
+
+        // Устанавливаем отступ и скроллим после рендера вариантов
+        requestAnimationFrame(() => {
+            const choicesHeight = this.elements.choices.offsetHeight;
+            this.elements.messages.style.paddingBottom = `${choicesHeight + 20}px`;
+            this._scrollToBottom();
+        });
     }
 
     /**
@@ -368,6 +375,7 @@ class UIController {
      */
     hideChoices() {
         this.elements.choices.innerHTML = '';
+        this.elements.messages.style.paddingBottom = '';
     }
 
     // ========================================

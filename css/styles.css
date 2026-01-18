@@ -364,7 +364,7 @@ input, textarea, select {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-md);
-    padding-bottom: calc(var(--spacing-xl) + 60px);
+    padding-bottom: 120px;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
