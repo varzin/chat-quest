@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#000000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Chat Quest</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar__header">
+            <h2 class="sidebar__title" data-i18n="scenarios">Сценарии</h2>
+            <button class="sidebar__close" id="sidebar-close" aria-label="Close menu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="sidebar__list" id="scenario-list">
+            <!-- Scenario items will be rendered here -->
+        </div>
+        <div class="sidebar__actions">
+            <button class="sidebar__btn" id="btn-add-scenario">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+                <span data-i18n="addScenario">Добавить сценарий</span>
+            </button>
+            <button class="sidebar__btn" id="btn-load-file">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+                <span data-i18n="loadFile">Загрузить файл</span>
+            </button>
+            <input type="file" id="file-input" accept=".ink,.txt" hidden>
+        </div>
+        <div class="sidebar__footer">
+            <button class="sidebar__btn sidebar__btn--settings" id="btn-settings">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+                </svg>
+                <span data-i18n="settings">Настройки</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <!-- Main Chat Container -->
+    <main class="chat">
+        <!-- Chat Header -->
+        <header class="chat__header">
+            <button class="chat__menu-btn" id="btn-menu" aria-label="Open menu">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 12h18M3 6h18M3 18h18"/>
+                </svg>
+            </button>
+            <div class="chat__header-info">
+                <h1 class="chat__title" id="chat-title">Chat Quest</h1>
+                <span class="chat__subtitle" id="chat-subtitle"></span>
+            </div>
+            <button class="chat__restart-btn" id="btn-restart" aria-label="Restart scenario">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15"/>
+                </svg>
+            </button>
+        </header>
+
+        <!-- Messages Container -->
+        <div class="chat__messages" id="messages">
+            <!-- Messages will be rendered here -->
+        </div>
+
+        <!-- Typing Indicator -->
+        <div class="typing-indicator" id="typing-indicator" hidden>
+            <div class="typing-indicator__avatar" id="typing-avatar"></div>
+            <div class="typing-indicator__bubble">
+                <span class="typing-indicator__dot"></span>
+                <span class="typing-indicator__dot"></span>
+                <span class="typing-indicator__dot"></span>
+            </div>
+        </div>
+
+        <!-- Choices Panel -->
+        <div class="chat__choices" id="choices">
+            <!-- Choice buttons will be rendered here -->
+        </div>
+
+        <!-- Empty State -->
+        <div class="chat__empty" id="empty-state" hidden>
+            <p data-i18n="noScenario">Выберите сценарий из меню</p>
+        </div>
+    </main>
+
+    <!-- Editor Modal -->
+    <div class="modal" id="editor-modal" hidden>
+        <div class="modal__content">
+            <div class="modal__header">
+                <h2 class="modal__title" id="editor-title" data-i18n="editScenario">Редактировать сценарий</h2>
+                <button class="modal__close" id="editor-close" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal__body">
+                <textarea class="modal__textarea" id="editor-textarea" placeholder="YAML + Ink код сценария..."></textarea>
+                <div class="modal__error" id="editor-error" hidden></div>
+            </div>
+            <div class="modal__footer">
+                <button class="modal__btn modal__btn--secondary" id="editor-cancel" data-i18n="cancel">Отмена</button>
+                <button class="modal__btn modal__btn--primary" id="editor-save" data-i18n="save">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal" hidden>
+        <div class="modal__content modal__content--small">
+            <div class="modal__header">
+                <h2 class="modal__title" data-i18n="settings">Настройки</h2>
+                <button class="modal__close" id="settings-close" aria-label="Close">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal__body">
+                <div class="settings-item">
+                    <label class="settings-item__label" data-i18n="language">Язык</label>
+                    <select class="settings-item__select" id="settings-language">
+                        <option value="ru">Русский</option>
+                        <option value="en">English</option>
+                    </select>
+                </div>
+                <div class="settings-item">
+                    <button class="settings-item__btn settings-item__btn--danger" id="btn-clear-data" data-i18n="clearData">Очистить все данные</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div class="modal" id="confirm-modal" hidden>
+        <div class="modal__content modal__content--small">
+            <div class="modal__header">
+                <h2 class="modal__title" id="confirm-title">Подтверждение</h2>
+            </div>
+            <div class="modal__body">
+                <p id="confirm-message"></p>
+            </div>
+            <div class="modal__footer">
+                <button class="modal__btn modal__btn--secondary" id="confirm-cancel" data-i18n="cancel">Отмена</button>
+                <button class="modal__btn modal__btn--danger" id="confirm-ok" data-i18n="confirm">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>
