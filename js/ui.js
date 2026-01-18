@@ -498,12 +498,7 @@ class UIController {
      */
     _scrollToBottom() {
         requestAnimationFrame(() => {
-            const lastMessage = this.elements.messages.lastElementChild;
-            if (lastMessage) {
-                lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            } else {
-                this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
-            }
+            this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
         });
     }
 
