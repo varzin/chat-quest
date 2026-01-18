@@ -370,7 +370,8 @@ class UIController {
         // Устанавливаем отступ и скроллим после рендера вариантов
         requestAnimationFrame(() => {
             const choicesHeight = this.elements.choices.offsetHeight;
-            this.elements.messages.style.paddingBottom = `${choicesHeight + 20}px`;
+            const safeAreaBottom = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--safe-area-bottom')) || 0;
+            this.elements.messages.style.paddingBottom = `${choicesHeight + safeAreaBottom + 40}px`;
             this._scrollToBottom();
         });
     }

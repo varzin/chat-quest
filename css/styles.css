@@ -551,7 +551,7 @@ input, textarea, select {
     flex: 1;
     overflow-y: auto;
     padding: var(--spacing-lg);
-    padding-bottom: 140px;
+    padding-bottom: calc(160px + var(--safe-area-bottom));
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
@@ -1217,11 +1217,14 @@ input, textarea, select {
     }
 
     .chat__choices {
+        left: 0;
+        transform: none;
+    }
+
+    .chat__choices .choice-btn {
         max-width: 600px;
-        margin: 0 auto;
-        width: 100%;
-        left: 50%;
-        transform: translateX(-50%);
+        margin-left: auto;
+        margin-right: auto;
     }
 }
 
