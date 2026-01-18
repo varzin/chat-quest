@@ -279,6 +279,7 @@ function parseInk(inkStr, participants) {
 function parseKnotContent(lines, participants) {
     const content = [];
     let currentSpeaker = null;
+    let lastChoice = null;
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -299,7 +300,10 @@ function parseKnotContent(lines, participants) {
         if (trimmed.startsWith('+')) {
             const choice = parseChoice(trimmed);
             if (choice) {
-                content.push({ type: 'choice', ...choice });
+                const choiceItem = { type: 'choice', ...choice };
+                content.push(choiceItem);
+                // Запоминаем последний choice чтобы связать с divert
+                lastChoice = choiceItem;
             }
             continue;
         }
@@ -307,17 +311,25 @@ function parseKnotContent(lines, participants) {
         // Divert: -> knot_name или -> END
         if (trimmed.startsWith('->')) {
             const target = trimmed.slice(2).trim();
-            content.push({ type: 'divert', target });
+            // Если есть предыдущий choice без target, связываем divert с ним
+            if (lastChoice && !lastChoice.target) {
+                lastChoice.target = target;
+            } else {
+                // Иначе добавляем как отдельный divert
+                content.push({ type: 'divert', target });
+                lastChoice = null;
+            }
             continue;
         }
 
-        // Обычный текст (реплика)
+        // Обычный текст (реплика) - сбрасываем lastChoice
         if (trimmed && !trimmed.startsWith('//') && !trimmed.startsWith('/*')) {
             content.push({
                 type: 'text',
                 speaker: currentSpeaker,
                 text: trimmed
             });
+            lastChoice = null;
         }
     }
 

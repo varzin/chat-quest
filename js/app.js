@@ -42,7 +42,7 @@ VAR speaker = ""
 
 Я заметил тебя издалека. Ты выглядишь потерянным.
 
-+ [Кто вы?]
++ [Кто вы такой?]
     -> who_are_you
 + [Мне нужна помощь]
     -> need_help
@@ -50,9 +50,6 @@ VAR speaker = ""
     -> just_walking
 
 === who_are_you ===
-~ speaker = "player"
-Кто вы такой?
-
 ~ speaker = "stranger"
 Меня зовут по-разному. Странник. Хранитель перекрёстков. Или просто... друг.
 
@@ -60,27 +57,21 @@ VAR speaker = ""
 
 + [Мне нужен совет]
     -> advice_path
-+ [Мне ничего не нужно]
++ [Мне ничего не нужно, я справлюсь сам]
     -> nothing_needed
 
 === need_help ===
-~ speaker = "player"
-Мне нужна помощь.
-
 ~ speaker = "stranger"
 Тогда ты пришёл по адресу.
 
 Что тебя беспокоит?
 
-+ [Я заблудился]
++ [Я заблудился, не знаю куда идти]
     -> lost_path
 + [Я ищу что-то важное]
     -> searching_path
 
 === just_walking ===
-~ speaker = "player"
-Я просто гуляю. Наслаждаюсь тишиной.
-
 ~ speaker = "stranger"
 Хороший ответ. Немногие ценят тишину в наши дни.
 
@@ -92,9 +83,6 @@ VAR speaker = ""
 -> END
 
 === advice_path ===
-~ speaker = "player"
-Мне нужен совет.
-
 ~ speaker = "stranger"
 Совет... Хорошо.
 
@@ -109,9 +97,6 @@ VAR speaker = ""
 -> END
 
 === nothing_needed ===
-~ speaker = "player"
-Мне ничего не нужно. Я справлюсь сам.
-
 ~ speaker = "stranger"
 Независимость — хорошее качество. Но помни: просить помощи — не слабость.
 
@@ -120,9 +105,6 @@ VAR speaker = ""
 -> END
 
 === lost_path ===
-~ speaker = "player"
-Я заблудился. Не знаю, куда идти.
-
 ~ speaker = "stranger"
 Заблудиться — первый шаг к тому, чтобы найти себя.
 
@@ -137,23 +119,17 @@ VAR speaker = ""
 -> END
 
 === searching_path ===
-~ speaker = "player"
-Я ищу что-то важное. Но не могу понять, что именно.
-
 ~ speaker = "stranger"
 Многие ищут, не зная что. Это называется путешествием.
 
 Может быть, ты ищешь не вещь, а ответ? Или человека?
 
-+ [Я ищу ответы]
++ [Я ищу ответы на свои вопросы]
     -> seeking_answers
-+ [Я ищу кого-то]
++ [Я ищу кого-то, кого потерял]
     -> seeking_someone
 
 === seeking_answers ===
-~ speaker = "player"
-Я ищу ответы на свои вопросы.
-
 ~ speaker = "stranger"
 Тогда продолжай идти вперёд. Ответы приходят к тем, кто не останавливается.
 
@@ -168,9 +144,6 @@ VAR speaker = ""
 -> END
 
 === seeking_someone ===
-~ speaker = "player"
-Я ищу кого-то. Человека, которого потерял.
-
 ~ speaker = "stranger"
 Потери... Они делают нас сильнее или ломают.
 
@@ -571,8 +544,9 @@ class ChatQuestApp {
 
             storage.saveScenario(id, config.dialog.title || t('untitled'), source, isDemo);
 
-            // Если редактировали текущий сценарий, перезагружаем его
-            if (id === this.currentScenarioId) {
+            // Если это новый сценарий или редактировали текущий - загружаем его
+            const isNew = !this._editingScenarioId;
+            if (isNew || id === this.currentScenarioId) {
                 storage.deleteProgress(id);
                 this._loadScenario(id);
             }

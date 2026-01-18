@@ -174,13 +174,12 @@ export class InkEngine {
     /**
      * Обрабатывает выбор пользователя
      * @param {number} choiceIndex - Индекс выбора
-     * @returns {Object} - Следующий контент
      */
     makeChoice(choiceIndex) {
         const knot = this.knots[this.currentKnot];
         if (!knot) {
             this.isEnded = true;
-            return { type: 'end' };
+            return;
         }
 
         // Находим выборы
@@ -196,25 +195,21 @@ export class InkEngine {
 
         const choice = choices[choiceIndex];
         if (!choice) {
-            return this.getCurrentContent();
+            return;
         }
 
         // Обрабатываем переход
         if (choice.target) {
             if (choice.target === 'END') {
                 this.isEnded = true;
-                return { type: 'end' };
             } else {
                 this.currentKnot = choice.target;
                 this.currentIndex = 0;
-                return this.getCurrentContent();
             }
+        } else {
+            // Если нет target, переходим в конец knot
+            this.currentIndex = content.length;
         }
-
-        // Если нет target, ищем divert после choice
-        // (это упрощение - в полном Ink выборы сложнее)
-        this.currentIndex = content.length;
-        return this.getCurrentContent();
     }
 
     /**
