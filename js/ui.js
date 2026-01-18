@@ -44,6 +44,7 @@ class UIController {
             // Settings Modal
             settingsModal: document.getElementById('settings-modal'),
             settingsClose: document.getElementById('settings-close'),
+            settingsTheme: document.getElementById('settings-theme'),
             settingsLanguage: document.getElementById('settings-language'),
             btnClearData: document.getElementById('btn-clear-data'),
 
@@ -65,6 +66,7 @@ class UIController {
             onRestart: null,
             onChoice: null,
             onEditorSave: null,
+            onThemeChange: null,
             onLanguageChange: null,
             onClearData: null
         };
@@ -126,6 +128,9 @@ class UIController {
 
         // Settings Modal
         this.elements.settingsClose.addEventListener('click', () => this.closeSettings());
+        this.elements.settingsTheme.addEventListener('change', (e) => {
+            this.callbacks.onThemeChange?.(e.target.value);
+        });
         this.elements.settingsLanguage.addEventListener('change', (e) => {
             this.callbacks.onLanguageChange?.(e.target.value);
         });
@@ -452,6 +457,19 @@ class UIController {
      */
     closeSettings() {
         this.elements.settingsModal.hidden = true;
+    }
+
+    /**
+     * Устанавливает тему
+     * @param {string} theme
+     */
+    setTheme(theme) {
+        this.elements.settingsTheme.value = theme;
+        if (theme === 'default') {
+            document.documentElement.removeAttribute('data-theme');
+        } else {
+            document.documentElement.setAttribute('data-theme', theme);
+        }
     }
 
     /**

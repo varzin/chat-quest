@@ -253,7 +253,7 @@ export class InkEngine {
      * @returns {Object}
      */
     getTypingSettings() {
-        return this.config.ui?.typing || { minDelayMs: 300, maxDelayMs: 2000 };
+        return this.config.ui?.typing || { minDelayMs: 600, maxDelayMs: 4000 };
     }
 
     /**
@@ -263,11 +263,11 @@ export class InkEngine {
      */
     calculateTypingDelay(text) {
         const settings = this.getTypingSettings();
-        const minDelay = settings.minDelayMs || 300;
-        const maxDelay = settings.maxDelayMs || 2000;
+        const minDelay = settings.minDelayMs || 600;
+        const maxDelay = settings.maxDelayMs || 4000;
 
-        // Примерно 50мс на символ, но в пределах min/max
-        const charDelay = 50;
+        // Примерно 100мс на символ, но в пределах min/max
+        const charDelay = 100;
         const calculatedDelay = text.length * charDelay;
 
         return Math.min(Math.max(calculatedDelay, minDelay), maxDelay);

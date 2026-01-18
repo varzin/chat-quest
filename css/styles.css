@@ -111,6 +111,95 @@
 }
 
 /* ========================================
+   Low Contrast Theme (Privacy Mode)
+   Dark gray tones for privacy
+   ======================================== */
+[data-theme="low-contrast"] {
+    /* Neutral gray palette */
+    --purple-deep: #0a0a0a;
+    --purple-dark: #111111;
+    --purple-mid: #181818;
+    --purple-rich: #222222;
+    --purple-vibrant: #333333;
+    --purple-bright: #3a3a3a;
+    --purple-glow: #444444;
+    --magenta-accent: #4a4a4a;
+
+    /* Background Colors - dark gray */
+    --bg-primary: #080808;
+    --bg-secondary: rgba(17, 17, 17, 0.95);
+    --bg-tertiary: rgba(24, 24, 24, 0.7);
+    --bg-glass: rgba(24, 24, 24, 0.5);
+    --bg-glass-strong: rgba(34, 34, 34, 0.6);
+
+    /* Message Backgrounds - subtle gray */
+    --bg-message-npc: rgba(22, 22, 22, 0.9);
+    --bg-message-player: linear-gradient(135deg, #2a2a2a 0%, #333333 50%, #3a3a3a 100%);
+    --bg-message-player-solid: #303030;
+
+    /* Sidebar */
+    --bg-sidebar: rgba(12, 12, 12, 0.98);
+    --bg-modal: rgba(8, 8, 8, 0.95);
+
+    /* Choice Buttons - subtle */
+    --bg-choice: rgba(40, 40, 40, 0.3);
+    --bg-choice-hover: rgba(50, 50, 50, 0.5);
+
+    /* Text Colors - low contrast gray */
+    --text-primary: rgba(160, 160, 160, 0.85);
+    --text-secondary: rgba(120, 120, 120, 0.7);
+    --text-tertiary: rgba(90, 90, 90, 0.5);
+    --text-timestamp: rgba(100, 100, 100, 0.6);
+    --text-on-player: rgba(170, 170, 170, 0.9);
+    --text-placeholder: rgba(80, 80, 80, 0.5);
+
+    /* Accent Colors - muted gray */
+    --accent-purple: #505050;
+    --accent-pink: #555555;
+    --accent-red: #4a3535;
+    --accent-green: #354a35;
+
+    /* Borders & Effects - very subtle */
+    --border-color: rgba(60, 60, 60, 0.2);
+    --border-glow: rgba(70, 70, 70, 0.15);
+    --glow-purple: 0 0 30px rgba(40, 40, 40, 0.1);
+    --glow-message: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+    /* Shadows - minimal */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.15);
+    --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 6px 20px rgba(0, 0, 0, 0.25);
+    --shadow-glow: 0 0 15px rgba(40, 40, 40, 0.05);
+}
+
+/* Remove glow effects in low contrast mode */
+[data-theme="low-contrast"] .chat::after {
+    background: radial-gradient(circle, rgba(30, 30, 30, 0.05) 0%, transparent 70%);
+}
+
+[data-theme="low-contrast"] .chat::before {
+    background: linear-gradient(180deg, #0a0a0a 0%, #111111 40%, #181818 100%);
+}
+
+/* Choices panel - remove purple glow */
+[data-theme="low-contrast"] .chat__choices::before {
+    background: linear-gradient(180deg,
+        transparent 0%,
+        rgba(10, 10, 10, 0.7) 15%,
+        rgba(10, 10, 10, 0.95) 40%,
+        rgba(10, 10, 10, 1) 60%);
+}
+
+[data-theme="low-contrast"] .chat__choices::after {
+    background: radial-gradient(ellipse, rgba(30, 30, 30, 0.1) 0%, transparent 70%);
+}
+
+/* Sidebar overlay - neutral */
+[data-theme="low-contrast"] .sidebar-overlay {
+    background: rgba(5, 5, 5, 0.8);
+}
+
+/* ========================================
    Reset & Base Styles
    ======================================== */
 *, *::before, *::after {
@@ -465,7 +554,7 @@ input, textarea, select {
     padding-bottom: 140px;
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
     position: relative;
     z-index: 1;
     scroll-behavior: smooth;
@@ -544,7 +633,7 @@ input, textarea, select {
     border-radius: var(--border-radius-lg);
     word-wrap: break-word;
     white-space: pre-wrap;
-    font-size: 15px;
+    font-size: var(--font-size-md);
     line-height: 1.5;
 }
 
@@ -603,7 +692,7 @@ input, textarea, select {
 
 /* Continuation messages */
 .message--continuation {
-    margin-top: calc(var(--spacing-sm) * -1);
+    margin-top: calc(var(--spacing-xs) * -1);
 }
 
 .message--continuation .message__avatar {

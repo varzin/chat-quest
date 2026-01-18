@@ -25,6 +25,9 @@ const translations = {
         editorPlaceholder: 'YAML + Ink код сценария...',
 
         // Settings
+        theme: 'Тема',
+        themeDefault: 'Стандартная',
+        themeLowContrast: 'Низкий контраст',
         language: 'Язык',
         clearData: 'Очистить все данные',
 
@@ -67,6 +70,9 @@ const translations = {
         editorPlaceholder: 'YAML + Ink scenario code...',
 
         // Settings
+        theme: 'Theme',
+        themeDefault: 'Default',
+        themeLowContrast: 'Low contrast',
         language: 'Language',
         clearData: 'Clear all data',
 

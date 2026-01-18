@@ -973,8 +973,9 @@ class ChatQuestApp {
             }
         }
 
-        // Устанавливаем язык в селекте настроек
+        // Устанавливаем язык и тему в селектах настроек
         this.ui.setLanguage(getLanguage());
+        this.ui.setTheme(settings.theme || 'default');
     }
 
     /**
@@ -1038,6 +1039,11 @@ class ChatQuestApp {
         this.ui.on('onChoice', (index) => this._handleChoice(index));
 
         this.ui.on('onEditorSave', (source) => this._saveScenario(source));
+
+        this.ui.on('onThemeChange', (theme) => {
+            this.ui.setTheme(theme);
+            storage.saveSettings({ theme });
+        });
 
         this.ui.on('onLanguageChange', (lang) => {
             setLanguage(lang);

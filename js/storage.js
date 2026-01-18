@@ -175,7 +175,7 @@ export function setCurrentScenarioId(id) {
  * @returns {Object}
  */
 export function getSettings() {
-    return safeGet(STORAGE_KEYS.SETTINGS) || { language: null };
+    return safeGet(STORAGE_KEYS.SETTINGS) || { language: null, theme: 'default' };
 }
 
 /**
