@@ -16,8 +16,6 @@ class UIController {
             sidebarClose: document.getElementById('sidebar-close'),
             scenarioList: document.getElementById('scenario-list'),
             btnAddScenario: document.getElementById('btn-add-scenario'),
-            btnLoadFile: document.getElementById('btn-load-file'),
-            fileInput: document.getElementById('file-input'),
             btnSettings: document.getElementById('btn-settings'),
 
             // Chat
@@ -40,6 +38,8 @@ class UIController {
             editorCancel: document.getElementById('editor-cancel'),
             editorSave: document.getElementById('editor-save'),
             editorPaste: document.getElementById('editor-paste'),
+            editorLoadFile: document.getElementById('editor-load-file'),
+            editorFileInput: document.getElementById('editor-file-input'),
 
             // Settings Modal
             settingsModal: document.getElementById('settings-modal'),
@@ -93,18 +93,6 @@ class UIController {
             this.callbacks.onAddScenario?.();
         });
 
-        this.elements.btnLoadFile.addEventListener('click', () => {
-            this.elements.fileInput.click();
-        });
-
-        this.elements.fileInput.addEventListener('change', (e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-                this.callbacks.onLoadFile?.(file);
-                e.target.value = '';
-            }
-        });
-
         this.elements.btnSettings.addEventListener('click', () => this.openSettings());
 
         // Chat
@@ -126,6 +114,19 @@ class UIController {
                 this.elements.editorTextarea.focus();
             } catch (e) {
                 console.error('Failed to read clipboard:', e);
+            }
+        });
+
+        this.elements.editorLoadFile?.addEventListener('click', () => {
+            this.elements.editorFileInput.click();
+        });
+
+        this.elements.editorFileInput?.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (file) {
+                this.callbacks.onLoadFile?.(file);
+                e.target.value = '';
+                this.closeEditor();
             }
         });
 

@@ -154,6 +154,17 @@ export function updatePageTranslations() {
     if (editorTextarea) {
         editorTextarea.placeholder = t('editorPlaceholder');
     }
+
+    // Обновляем title для иконочных кнопок в editor header
+    const editorPaste = document.getElementById('editor-paste');
+    if (editorPaste) {
+        editorPaste.title = t('paste');
+    }
+
+    const editorLoadFile = document.getElementById('editor-load-file');
+    if (editorLoadFile) {
+        editorLoadFile.title = t('loadFile');
+    }
 }
 
 /**

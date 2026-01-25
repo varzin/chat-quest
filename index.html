@@ -31,13 +31,6 @@
                 </svg>
                 <span data-i18n="addScenario">Добавить сценарий</span>
             </button>
-            <button class="sidebar__btn" id="btn-load-file">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
-                </svg>
-                <span data-i18n="loadFile">Загрузить файл</span>
-            </button>
-            <input type="file" id="file-input" accept=".ink,.txt" hidden>
         </div>
         <div class="sidebar__footer">
             <button class="sidebar__btn sidebar__btn--settings" id="btn-settings">
@@ -105,23 +98,34 @@
         <div class="modal__content">
             <div class="modal__header">
                 <h2 class="modal__title" id="editor-title" data-i18n="editScenario">Редактировать сценарий</h2>
-                <button class="modal__close" id="editor-close" aria-label="Close">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M18 6L6 18M6 6l12 12"/>
-                    </svg>
-                </button>
+                <div class="modal__header-actions">
+                    <button class="modal__icon-btn" id="editor-paste" aria-label="Paste from clipboard" title="Вставить из буфера">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+                        </svg>
+                    </button>
+                    <button class="modal__icon-btn" id="editor-load-file" aria-label="Load file" title="Загрузить файл">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                    </button>
+                    <button class="modal__close" id="editor-close" aria-label="Close">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
             <div class="modal__body">
                 <textarea class="modal__textarea" id="editor-textarea" placeholder="YAML + Ink код сценария..."></textarea>
                 <div class="modal__error" id="editor-error" hidden></div>
             </div>
-            <div class="modal__footer modal__footer--spread">
-                <button class="modal__btn modal__btn--ghost" id="editor-paste" data-i18n="paste">Вставить</button>
-                <div class="modal__footer-actions">
-                    <button class="modal__btn modal__btn--secondary" id="editor-cancel" data-i18n="cancel">Отмена</button>
-                    <button class="modal__btn modal__btn--primary" id="editor-save" data-i18n="save">Сохранить</button>
-                </div>
+            <div class="modal__footer">
+                <button class="modal__btn modal__btn--secondary" id="editor-cancel" data-i18n="cancel">Отмена</button>
+                <button class="modal__btn modal__btn--primary" id="editor-save" data-i18n="save">Сохранить</button>
             </div>
+            <input type="file" id="editor-file-input" accept=".ink,.txt" hidden>
         </div>
     </div>
 
