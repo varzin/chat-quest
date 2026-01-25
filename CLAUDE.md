@@ -1,14 +1,14 @@
 # Chat Quest - Messenger Quest Player
 
 ## Описание проекта
-Веб-приложение для проигрывания интерактивных квест-сценариев в стиле мессенджера (iMessage). Работает полностью в браузере без серверной части (HTML + CSS + JS).
+Веб-приложение для проигрывания интерактивных квест-сценариев в стиле мессенджера. Работает полностью в браузере без серверной части (HTML + CSS + JS).
 
 ## Технические требования
 - **Платформа**: Чистый HTML5 + CSS3 + Vanilla JavaScript (ES6+)
 - **Без сборки**: Работает напрямую в браузере без Node.js, Webpack и т.д.
 - **Хранение данных**: localStorage для сценариев и прогресса
 - **Адаптивность**: Mobile-first дизайн
-- **Тема**: Dark mode в стиле iMessage
+- **Темы**: Purple glass-morphism (по умолчанию) + low contrast режим
 
 ## Архитектура
 
@@ -47,11 +47,12 @@ chat-quest/
 - Отслеживание состояния для сохранения
 
 #### ui.js
-- Рендеринг сообщений в стиле iMessage
+- Рендеринг сообщений с glass-morphism эффектами
 - Sidebar с списком сценариев
-- Кнопки выбора внизу экрана
+- Кнопки выбора внизу экрана (full-width backdrop)
 - Typing indicator с задержкой по длине сообщения
-- Модальное окно редактора
+- Модальные окна редактора и настроек
+- Переключение между темами (purple/low contrast)
 
 #### storage.js
 - Сохранение/загрузка сценариев
@@ -63,15 +64,16 @@ chat-quest/
 ### Основные экраны
 1. **Chat View** - основной экран с диалогом
 2. **Sidebar** - выдвигающееся меню со списком сценариев
-3. **Editor Modal** - редактор сценария (textarea)
-4. **Settings** - настройки (язык, очистка данных)
+3. **Editor Modal** - редактор сценария (textarea с подсветкой синтаксиса)
+4. **Settings Modal** - настройки (тема, язык, очистка данных)
 
 ### Элементы чата
-- Сообщения NPC (слева, серый фон)
-- Сообщения Player (справа, синий фон как в iMessage)
+- Сообщения NPC (слева, полупрозрачный фиолетовый фон)
+- Сообщения Player (справа, градиентный фиолетовый фон)
 - Аватары персонажей
 - Typing indicator (три точки с анимацией)
-- Кнопки выбора (внизу, вместо поля ввода)
+- Кнопки выбора (внизу, full-width backdrop с blur эффектом)
+- Glass-morphism эффекты на всех элементах
 
 ## Формат сценариев
 Файлы используют YAML front matter + Ink синтаксис.
@@ -83,20 +85,41 @@ chat-quest/
 
 ## Стили и дизайн
 
-### Цветовая палитра (Dark theme)
+### Цветовая палитра (Purple Glass-Morphism)
 ```css
---bg-primary: #000000;
---bg-secondary: #1c1c1e;
---bg-message-npc: #3a3a3c;
---bg-message-player: #0a84ff;
+/* Core Purple Palette */
+--purple-deep: #0a0612;
+--purple-dark: #1a0a2e;
+--purple-vibrant: #9b30ff;
+--purple-bright: #bf40ff;
+--purple-glow: #d060ff;
+--magenta-accent: #e040fb;
+
+/* Backgrounds */
+--bg-primary: #080410;
+--bg-glass: rgba(45, 27, 78, 0.35);
+--bg-message-npc: rgba(40, 25, 65, 0.75);
+--bg-message-player: linear-gradient(135deg, #9b30ff 0%, #bf40ff 50%, #d060ff 100%);
+
+/* Text */
 --text-primary: #ffffff;
---text-secondary: #8e8e93;
+--text-secondary: rgba(200, 180, 220, 0.8);
+--text-tertiary: rgba(160, 140, 180, 0.6);
+
+/* Effects */
+--blur-md: 16px;
+--glow-purple: 0 0 60px rgba(155, 48, 255, 0.3);
 ```
 
+### Low Contrast Theme
+Альтернативная тема с пониженной контрастностью для комфортного использования.
+Переключается через настройки (Settings → Theme).
+
 ### Типография
-- Системный шрифт: -apple-system, BlinkMacSystemFont, 'Segoe UI'
+- Основной шрифт: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI'
 - Размер сообщений: 17px
-- Межстрочный интервал: 1.4
+- Межстрочный интервал: 1.45
+- Letter spacing: 0.01em
 
 ## Важные соглашения
 
@@ -110,6 +133,8 @@ chat-quest/
 - CSS Custom Properties для темизации
 - BEM-подобное именование классов
 - Mobile-first медиа-запросы
+- Glass-morphism эффекты: backdrop-filter, rgba цвета, градиенты
+- Поддержка нескольких тем через data-атрибуты
 
 ### Ink парсер
 - Поддержка: VAR, knots (===), choices (+), divert (->), END
