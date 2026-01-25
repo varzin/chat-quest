@@ -1169,6 +1169,277 @@ input, textarea, select {
     color: var(--text-on-player);
 }
 
+.settings-item__group {
+    display: flex;
+    gap: 12px;
+}
+
+.settings-item__field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.settings-item__field-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.settings-item__input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-glass);
+    border: 1px solid rgba(155, 48, 255, 0.2);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 15px;
+    transition: all 0.2s;
+}
+
+.settings-item__input:focus {
+    outline: none;
+    border-color: var(--purple-vibrant);
+    background: var(--bg-glass-strong);
+}
+
+/* ========================================
+   Theme Selector (Segmented Control)
+   ======================================== */
+.theme-selector {
+    display: flex;
+    gap: var(--spacing-sm);
+    padding: 4px;
+    background: rgba(20, 10, 40, 0.6);
+    border-radius: var(--border-radius-md);
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(var(--blur-sm));
+}
+
+.theme-selector__input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.theme-selector__option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    padding: 12px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.theme-selector__option::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--purple-vibrant), var(--purple-bright));
+    opacity: 0;
+    transition: opacity var(--transition-normal);
+}
+
+.theme-selector__input:checked + .theme-selector__option::before {
+    opacity: 1;
+}
+
+.theme-selector__option:hover::before {
+    opacity: 0.5;
+}
+
+.theme-selector__input:checked + .theme-selector__option:hover::before {
+    opacity: 1;
+}
+
+.theme-selector__icon,
+.theme-selector__label {
+    position: relative;
+    z-index: 1;
+}
+
+.theme-selector__icon {
+    display: flex;
+    align-items: center;
+    color: var(--text-secondary);
+    transition: color var(--transition-normal);
+}
+
+.theme-selector__input:checked + .theme-selector__option .theme-selector__icon {
+    color: var(--text-on-player);
+}
+
+.theme-selector__label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color var(--transition-normal);
+}
+
+.theme-selector__input:checked + .theme-selector__option .theme-selector__label {
+    color: var(--text-on-player);
+}
+
+/* ========================================
+   Slider Control (Custom Range)
+   ======================================== */
+.slider-control {
+    margin-top: var(--spacing-md);
+    padding: 0 2px;
+}
+
+.slider-control:first-of-type {
+    margin-top: 0;
+}
+
+.slider-control__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-sm);
+}
+
+.slider-control__label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    letter-spacing: 0.02em;
+}
+
+.slider-control__value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--purple-bright);
+    font-variant-numeric: tabular-nums;
+    min-width: 52px;
+    text-align: right;
+}
+
+.slider-control__input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.slider-control__track {
+    position: relative;
+    height: 8px;
+    background: rgba(20, 10, 40, 0.6);
+    border-radius: var(--border-radius-full);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    margin: 10px 0;
+}
+
+.slider-control__track::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: var(--border-radius-full);
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.slider-control__fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg, var(--purple-vibrant), var(--purple-bright));
+    transition: width var(--transition-fast);
+    box-shadow: 0 0 20px rgba(155, 48, 255, 0.4);
+    pointer-events: none;
+    border-radius: var(--border-radius-full) 0 0 var(--border-radius-full);
+}
+
+.slider-control__fill::after {
+    content: '';
+    position: absolute;
+    right: -10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    background: linear-gradient(135deg, var(--purple-bright), var(--purple-glow));
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow:
+        0 2px 12px rgba(155, 48, 255, 0.6),
+        inset 0 1px 3px rgba(255, 255, 255, 0.3);
+    cursor: grab;
+    transition: all var(--transition-fast);
+    pointer-events: auto;
+    z-index: 10;
+}
+
+.slider-control__track:hover .slider-control__fill::after {
+    transform: translateY(-50%) scale(1.15);
+    box-shadow:
+        0 4px 16px rgba(155, 48, 255, 0.8),
+        inset 0 1px 3px rgba(255, 255, 255, 0.3);
+}
+
+.slider-control__track:active .slider-control__fill::after {
+    cursor: grabbing;
+    transform: translateY(-50%) scale(1.05);
+}
+
+/* ========================================
+   Language Selector (Custom Dropdown)
+   ======================================== */
+.language-selector {
+    position: relative;
+}
+
+.language-selector__select {
+    width: 100%;
+    padding: 14px 48px 14px 16px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.language-selector__select:hover {
+    background: var(--bg-glass-strong);
+    border-color: var(--border-glow);
+}
+
+.language-selector__select:focus {
+    outline: none;
+    border-color: var(--purple-vibrant);
+    box-shadow:
+        0 0 0 3px rgba(155, 48, 255, 0.15),
+        var(--shadow-glow);
+}
+
+.language-selector__icon {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+    transition: all var(--transition-normal);
+}
+
+.language-selector__select:focus ~ .language-selector__icon {
+    color: var(--purple-bright);
+    transform: translateY(-50%) rotate(180deg);
+}
+
 /* ========================================
    Scrollbar Styling
    ======================================== */

@@ -51,9 +51,10 @@ class ChatQuestApp {
             }
         }
 
-        // Устанавливаем язык и тему в селектах настроек
+        // Устанавливаем язык, тему и typing delays в UI настроек
         this.ui.setLanguage(getLanguage());
         this.ui.setTheme(settings.theme || 'default');
+        this.ui.setTypingDelays(settings.typingMinDelay || 400, settings.typingMaxDelay || 1600);
     }
 
     /**
@@ -121,6 +122,19 @@ class ChatQuestApp {
         this.ui.on('onThemeChange', (theme) => {
             this.ui.setTheme(theme);
             storage.saveSettings({ theme });
+        });
+
+        this.ui.on('onTypingDelayChange', (minDelay, maxDelay) => {
+            storage.saveSettings({
+                typingMinDelay: minDelay,
+                typingMaxDelay: maxDelay
+            });
+
+            // Обновить engine если он существует
+            if (this.engine) {
+                const settings = storage.getSettings();
+                this.engine.globalSettings = settings;
+            }
         });
 
         this.ui.on('onLanguageChange', (lang) => {
@@ -192,7 +206,8 @@ class ChatQuestApp {
         try {
             const { config, knots, variables } = parseScenario(source);
 
-            this.engine = new InkEngine(config, knots, variables);
+            const settings = storage.getSettings();
+            this.engine = new InkEngine(config, knots, variables, settings);
             this.currentScenarioId = id;
 
             // Сохраняем как текущий

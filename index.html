@@ -137,20 +137,101 @@
                 </button>
             </div>
             <div class="modal__body">
+                <!-- Theme Selector -->
                 <div class="settings-item">
                     <label class="settings-item__label" data-i18n="theme">Тема</label>
-                    <select class="settings-item__select" id="settings-theme">
-                        <option value="default" data-i18n-option="themeDefault">Стандартная</option>
-                        <option value="low-contrast" data-i18n-option="themeLowContrast">Низкий контраст</option>
-                    </select>
+                    <div class="theme-selector">
+                        <input type="radio" name="theme" id="theme-default" value="default" class="theme-selector__input">
+                        <label for="theme-default" class="theme-selector__option">
+                            <span class="theme-selector__icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="5"/>
+                                    <line x1="12" y1="1" x2="12" y2="3"/>
+                                    <line x1="12" y1="21" x2="12" y2="23"/>
+                                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                                    <line x1="1" y1="12" x2="3" y2="12"/>
+                                    <line x1="21" y1="12" x2="23" y2="12"/>
+                                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                                </svg>
+                            </span>
+                            <span class="theme-selector__label" data-i18n="themeDefault">Стандартная</span>
+                        </label>
+                        <input type="radio" name="theme" id="theme-low-contrast" value="low-contrast" class="theme-selector__input">
+                        <label for="theme-low-contrast" class="theme-selector__option">
+                            <span class="theme-selector__icon">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                                </svg>
+                            </span>
+                            <span class="theme-selector__label" data-i18n="themeLowContrast">Низкий контраст</span>
+                        </label>
+                        <select id="settings-theme" hidden>
+                            <option value="default">Default</option>
+                            <option value="low-contrast">Low Contrast</option>
+                        </select>
+                    </div>
                 </div>
+
+                <!-- Typing Speed Sliders -->
+                <div class="settings-item">
+                    <label class="settings-item__label" data-i18n="typingSpeed">Скорость печати</label>
+
+                    <div class="slider-control">
+                        <div class="slider-control__header">
+                            <span class="slider-control__label" data-i18n="typingMin">Мин (мс)</span>
+                            <span class="slider-control__value" id="typing-min-value">400</span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider-control__input"
+                            id="settings-typing-min"
+                            min="200"
+                            max="2000"
+                            step="100"
+                            value="400"
+                        >
+                        <div class="slider-control__track">
+                            <div class="slider-control__fill" id="typing-min-fill"></div>
+                        </div>
+                    </div>
+
+                    <div class="slider-control">
+                        <div class="slider-control__header">
+                            <span class="slider-control__label" data-i18n="typingMax">Макс (мс)</span>
+                            <span class="slider-control__value" id="typing-max-value">1600</span>
+                        </div>
+                        <input
+                            type="range"
+                            class="slider-control__input"
+                            id="settings-typing-max"
+                            min="400"
+                            max="5000"
+                            step="100"
+                            value="1600"
+                        >
+                        <div class="slider-control__track">
+                            <div class="slider-control__fill" id="typing-max-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Language Selector -->
                 <div class="settings-item">
                     <label class="settings-item__label" data-i18n="language">Язык</label>
-                    <select class="settings-item__select" id="settings-language">
-                        <option value="ru">Русский</option>
-                        <option value="en">English</option>
-                    </select>
+                    <div class="language-selector">
+                        <select class="language-selector__select" id="settings-language">
+                            <option value="ru">🇷🇺 Русский</option>
+                            <option value="en">🇬🇧 English</option>
+                        </select>
+                        <svg class="language-selector__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M6 9l6 6 6-6"/>
+                        </svg>
+                    </div>
                 </div>
+
+                <!-- Clear Data Button -->
                 <div class="settings-item">
                     <button class="settings-item__btn settings-item__btn--danger" id="btn-clear-data" data-i18n="clearData">Очистить все данные</button>
                 </div>

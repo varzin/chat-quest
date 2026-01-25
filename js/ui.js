@@ -45,6 +45,8 @@ class UIController {
             settingsModal: document.getElementById('settings-modal'),
             settingsClose: document.getElementById('settings-close'),
             settingsTheme: document.getElementById('settings-theme'),
+            settingsTypingMin: document.getElementById('settings-typing-min'),
+            settingsTypingMax: document.getElementById('settings-typing-max'),
             settingsLanguage: document.getElementById('settings-language'),
             btnClearData: document.getElementById('btn-clear-data'),
 
@@ -67,6 +69,7 @@ class UIController {
             onChoice: null,
             onEditorSave: null,
             onThemeChange: null,
+            onTypingDelayChange: null,
             onLanguageChange: null,
             onClearData: null
         };
@@ -128,9 +131,31 @@ class UIController {
 
         // Settings Modal
         this.elements.settingsClose.addEventListener('click', () => this.closeSettings());
+
+        // Theme selector (radio buttons sync with select)
+        document.querySelectorAll('input[name="theme"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.elements.settingsTheme.value = e.target.value;
+                this.callbacks.onThemeChange?.(e.target.value);
+            });
+        });
+
         this.elements.settingsTheme.addEventListener('change', (e) => {
             this.callbacks.onThemeChange?.(e.target.value);
         });
+
+        // Custom slider for typing min
+        this._setupSlider('settings-typing-min', 200, 2000, (value) => {
+            const max = parseInt(this.elements.settingsTypingMax.value) || 1600;
+            this.callbacks.onTypingDelayChange?.(value, max);
+        });
+
+        // Custom slider for typing max
+        this._setupSlider('settings-typing-max', 400, 5000, (value) => {
+            const min = parseInt(this.elements.settingsTypingMin.value) || 400;
+            this.callbacks.onTypingDelayChange?.(min, value);
+        });
+
         this.elements.settingsLanguage.addEventListener('change', (e) => {
             this.callbacks.onLanguageChange?.(e.target.value);
         });
@@ -461,11 +486,38 @@ class UIController {
     }
 
     /**
-     * Устанавливает тему
+     * Устанавливает текущий язык в селекте
+     * @param {string} lang
+     */
+    setLanguage(lang) {
+        this.elements.settingsLanguage.value = lang;
+    }
+
+    /**
+     * Устанавливает значения typing delays в UI
+     * @param {number} minDelay
+     * @param {number} maxDelay
+     */
+    setTypingDelays(minDelay, maxDelay) {
+        if (this.elements.settingsTypingMin) {
+            this.elements.settingsTypingMin.value = minDelay;
+            this._updateSliderVisual('settings-typing-min', minDelay, 200, 2000);
+        }
+        if (this.elements.settingsTypingMax) {
+            this.elements.settingsTypingMax.value = maxDelay;
+            this._updateSliderVisual('settings-typing-max', maxDelay, 400, 5000);
+        }
+    }
+
+    /**
+     * Устанавливает тему в radio buttons
      * @param {string} theme
      */
     setTheme(theme) {
         this.elements.settingsTheme.value = theme;
+        const radio = document.getElementById(`theme-${theme}`);
+        if (radio) radio.checked = true;
+
         if (theme === 'default') {
             document.documentElement.removeAttribute('data-theme');
         } else {
@@ -474,11 +526,93 @@ class UIController {
     }
 
     /**
-     * Устанавливает текущий язык в селекте
-     * @param {string} lang
+     * Настраивает интерактивный слайдер
+     * @param {string} inputId
+     * @param {number} min
+     * @param {number} max
+     * @param {Function} onChange
      */
-    setLanguage(lang) {
-        this.elements.settingsLanguage.value = lang;
+    _setupSlider(inputId, min, max, onChange) {
+        const input = document.getElementById(inputId);
+        if (!input) return;
+
+        const track = input.nextElementSibling;
+        if (!track || !track.classList.contains('slider-control__track')) return;
+
+        const fill = track.querySelector('.slider-control__fill');
+        const valueDisplay = document.getElementById(`${inputId.replace('settings-', '')}-value`);
+
+        const updateVisual = () => {
+            const value = parseInt(input.value);
+            const percent = ((value - min) / (max - min)) * 100;
+            if (fill) fill.style.width = `${percent}%`;
+            if (valueDisplay) valueDisplay.textContent = value;
+        };
+
+        const updateFromPosition = (clientX) => {
+            const rect = track.getBoundingClientRect();
+            const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+            const value = Math.round(min + percent * (max - min));
+            const step = parseInt(input.step) || 1;
+            input.value = Math.round(value / step) * step;
+            updateVisual();
+            onChange(parseInt(input.value));
+        };
+
+        let isDragging = false;
+
+        // Mouse/touch handlers for dragging
+        const startDrag = (e) => {
+            isDragging = true;
+            track.style.cursor = 'grabbing';
+            updateFromPosition(e.clientX || e.touches[0].clientX);
+            e.preventDefault();
+        };
+
+        const drag = (e) => {
+            if (!isDragging) return;
+            updateFromPosition(e.clientX || e.touches[0].clientX);
+            e.preventDefault();
+        };
+
+        const endDrag = () => {
+            isDragging = false;
+            track.style.cursor = 'pointer';
+        };
+
+        // Track interactions
+        track.addEventListener('mousedown', startDrag);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', endDrag);
+
+        track.addEventListener('touchstart', startDrag);
+        document.addEventListener('touchmove', drag);
+        document.addEventListener('touchend', endDrag);
+
+        // Input change handler (for accessibility - keyboard)
+        input.addEventListener('input', () => {
+            updateVisual();
+            onChange(parseInt(input.value));
+        });
+
+        // Initial update
+        updateVisual();
+    }
+
+    /**
+     * Обновляет визуал слайдера
+     * @param {string} inputId
+     * @param {number} value
+     * @param {number} min
+     * @param {number} max
+     */
+    _updateSliderVisual(inputId, value, min, max) {
+        const fill = document.getElementById(`${inputId.replace('settings-', '')}-fill`);
+        const valueDisplay = document.getElementById(`${inputId.replace('settings-', '')}-value`);
+
+        const percent = ((value - min) / (max - min)) * 100;
+        if (fill) fill.style.width = `${percent}%`;
+        if (valueDisplay) valueDisplay.textContent = value;
     }
 
     // ========================================

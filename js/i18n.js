@@ -29,6 +29,9 @@ const translations = {
         themeDefault: 'Стандартная',
         themeLowContrast: 'Низкий контраст',
         language: 'Язык',
+        typingSpeed: 'Скорость печати',
+        typingMin: 'Мин (мс)',
+        typingMax: 'Макс (мс)',
         clearData: 'Очистить все данные',
 
         // Confirmations
@@ -74,6 +77,9 @@ const translations = {
         themeDefault: 'Default',
         themeLowContrast: 'Low contrast',
         language: 'Language',
+        typingSpeed: 'Typing speed',
+        typingMin: 'Min (ms)',
+        typingMax: 'Max (ms)',
         clearData: 'Clear all data',
 
         // Confirmations

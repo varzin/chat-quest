@@ -41,14 +41,14 @@ characters:
 
 ### Опциональные поля
 
-#### ui (object)
+#### ui (object) - DEPRECATED
 ```yaml
-ui:
-  typing:
-    minDelayMs: 200         # Минимальная задержка (мс)
-    maxDelayMs: 1200        # Максимальная задержка (мс)
-  allowRestart: true        # Разрешить перезапуск
+# УСТАРЕЛО: Эта секция больше не используется
+# Настройки typing delays теперь управляются глобально через Settings
+# allowRestart всегда включен
 ```
+
+**Примечание:** Настройки typing delays (minDelayMs, maxDelayMs) теперь доступны в глобальных настройках приложения (Settings → Скорость печати). Перезапуск сценария всегда разрешён и не требует настройки.
 
 ## Ink-сценарий
 
@@ -115,12 +115,6 @@ characters:
     name: "Сергей"
     color: "#7ED321"
     avatar: "https://example.com/sergey.png"
-
-ui:
-  typing:
-    minDelayMs: 200
-    maxDelayMs: 1200
-  allowRestart: true
 ---
 
 VAR speaker = ""

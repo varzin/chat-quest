@@ -9,11 +9,13 @@ export class InkEngine {
      * @param {Object} config - Конфигурация из YAML
      * @param {Object} knots - Узлы сценария
      * @param {Object} variables - Переменные
+     * @param {Object} globalSettings - Глобальные настройки приложения
      */
-    constructor(config, knots, variables) {
+    constructor(config, knots, variables, globalSettings = null) {
         this.config = config;
         this.knots = knots;
         this.initialVariables = { ...variables };
+        this.globalSettings = globalSettings;
 
         // Состояние
         this.variables = { ...variables };
@@ -249,11 +251,19 @@ export class InkEngine {
     }
 
     /**
-     * Получает настройки typing из конфига
+     * Получает настройки typing из глобальных настроек или конфига
      * @returns {Object}
      */
     getTypingSettings() {
-        return this.config.ui?.typing || { minDelayMs: 600, maxDelayMs: 4000 };
+        // Приоритет: глобальные настройки > fallback
+        if (this.globalSettings) {
+            return {
+                minDelayMs: this.globalSettings.typingMinDelay || 400,
+                maxDelayMs: this.globalSettings.typingMaxDelay || 1600
+            };
+        }
+        // Fallback для обратной совместимости
+        return this.config.ui?.typing || { minDelayMs: 400, maxDelayMs: 1600 };
     }
 
     /**
@@ -278,7 +288,7 @@ export class InkEngine {
      * @returns {boolean}
      */
     allowRestart() {
-        return this.config.ui?.allowRestart !== false;
+        return true; // Всегда разрешаем перезапуск
     }
 
     /**

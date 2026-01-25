@@ -13,12 +13,6 @@ characters:
     name: "Путник"
     color: "#9b30ff"
     avatar: "https://mockmind-api.uifaces.co/content/human/200.jpg"
-
-ui:
-  typing:
-    minDelayMs: 500
-    maxDelayMs: 2000
-  allowRestart: true
 ---
 
 VAR speaker = ""
