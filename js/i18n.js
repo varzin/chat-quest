@@ -8,6 +8,8 @@ const translations = {
     ru: {
         // Sidebar
         scenarios: 'Сценарии',
+        chats: 'Чаты',
+        newChat: 'Новый чат',
         addScenario: 'Добавить сценарий',
         loadFile: 'Загрузить файл',
         settings: 'Настройки',
@@ -19,14 +21,18 @@ const translations = {
         // Editor
         editScenario: 'Редактировать сценарий',
         newScenario: 'Новый сценарий',
+        tabScenario: 'Сценарий',
+        tabAiChat: 'AI Чат',
         save: 'Сохранить',
         cancel: 'Отмена',
         paste: 'Вставить',
+        useTemplate: 'Шаблон',
         editorPlaceholder: 'YAML + Ink код сценария...',
 
         // Settings
         theme: 'Тема',
         themeDefault: 'Стандартная',
+        themeNeutral: 'Нейтральная',
         themeLowContrast: 'Низкий контраст',
         language: 'Язык',
         typingSpeed: 'Скорость печати',
@@ -48,6 +54,44 @@ const translations = {
         // Demo
         demoTitle: 'Демо: Встреча',
 
+        // Settings Tabs
+        settingsGeneral: 'Основные',
+        settingsApiKeys: 'API Ключи',
+        settingsCharacters: 'Персонажи',
+
+        // API Keys
+        apiKeyOpenai: 'OpenAI',
+        apiKeyGrok: 'Grok (xAI)',
+        apiKeyPlaceholder: 'Вставьте API ключ...',
+        apiKeySaved: 'Ключ сохранён',
+        apiKeyRemoved: 'Ключ удалён',
+
+        // Characters
+        addCharacter: 'Добавить персонажа',
+        characterName: 'Имя',
+        characterNamePlaceholder: 'Имя персонажа...',
+        characterPrompt: 'Системный промпт',
+        characterPromptPlaceholder: 'Опишите характер и поведение персонажа...',
+        saveCharacter: 'Сохранить',
+        editCharacter: 'Редактировать',
+        deleteCharacter: 'Удалить',
+        noCharacters: 'Нет персонажей',
+        confirmDeleteCharacter: 'Удалить персонажа "{name}"?',
+        confirmDeleteChat: 'Удалить чат с "{name}"?',
+        confirmRestartChat: 'Очистить историю чата?',
+
+        // AI Chat Setup
+        chatTitle: 'Название чата',
+        chatTitlePlaceholder: 'Необязательно...',
+        selectCharacter: 'Персонаж',
+        selectModel: 'Модель',
+        modelPriceHint: 'Цена: ввод / вывод за 1M токенов, USD',
+        startChat: 'Начать чат',
+        noApiKeys: 'API ключи не настроены',
+        fixInSettings: 'Настроить',
+        noCharactersHint: 'Создайте персонажа в настройках',
+        messagePlaceholder: 'Сообщение...',
+
         // Misc
         player: 'Игрок',
         untitled: 'Без названия'
@@ -56,6 +100,8 @@ const translations = {
     en: {
         // Sidebar
         scenarios: 'Scenarios',
+        chats: 'Chats',
+        newChat: 'New chat',
         addScenario: 'Add scenario',
         loadFile: 'Load file',
         settings: 'Settings',
@@ -67,14 +113,18 @@ const translations = {
         // Editor
         editScenario: 'Edit scenario',
         newScenario: 'New scenario',
+        tabScenario: 'Scenario',
+        tabAiChat: 'AI Chat',
         save: 'Save',
         cancel: 'Cancel',
         paste: 'Paste',
+        useTemplate: 'Template',
         editorPlaceholder: 'YAML + Ink scenario code...',
 
         // Settings
         theme: 'Theme',
         themeDefault: 'Default',
+        themeNeutral: 'Neutral',
         themeLowContrast: 'Low contrast',
         language: 'Language',
         typingSpeed: 'Typing speed',
@@ -95,6 +145,44 @@ const translations = {
 
         // Demo
         demoTitle: 'Demo: The Meeting',
+
+        // Settings Tabs
+        settingsGeneral: 'General',
+        settingsApiKeys: 'API Keys',
+        settingsCharacters: 'Characters',
+
+        // API Keys
+        apiKeyOpenai: 'OpenAI',
+        apiKeyGrok: 'Grok (xAI)',
+        apiKeyPlaceholder: 'Paste API key...',
+        apiKeySaved: 'Key saved',
+        apiKeyRemoved: 'Key removed',
+
+        // Characters
+        addCharacter: 'Add character',
+        characterName: 'Name',
+        characterNamePlaceholder: 'Character name...',
+        characterPrompt: 'System prompt',
+        characterPromptPlaceholder: 'Describe the character\'s personality and behavior...',
+        saveCharacter: 'Save',
+        editCharacter: 'Edit',
+        deleteCharacter: 'Delete',
+        noCharacters: 'No characters',
+        confirmDeleteCharacter: 'Delete character "{name}"?',
+        confirmDeleteChat: 'Delete chat with "{name}"?',
+        confirmRestartChat: 'Clear chat history?',
+
+        // AI Chat Setup
+        chatTitle: 'Chat title',
+        chatTitlePlaceholder: 'Optional...',
+        selectCharacter: 'Character',
+        selectModel: 'Model',
+        modelPriceHint: 'Price: input / output per 1M tokens, USD',
+        startChat: 'Start chat',
+        noApiKeys: 'No API keys configured',
+        fixInSettings: 'Fix in settings',
+        noCharactersHint: 'Create a character in Settings',
+        messagePlaceholder: 'Message...',
 
         // Misc
         player: 'Player',
@@ -165,6 +253,17 @@ export function updatePageTranslations() {
     if (editorLoadFile) {
         editorLoadFile.title = t('loadFile');
     }
+
+    const editorTemplate = document.getElementById('editor-template');
+    if (editorTemplate) {
+        editorTemplate.title = t('useTemplate');
+    }
+
+    // Обновляем placeholder для API ключей
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        el.placeholder = t(key);
+    });
 }
 
 /**

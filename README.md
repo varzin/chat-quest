@@ -26,6 +26,16 @@ Then open `http://localhost:8080` in your browser.
 
 Scenarios use YAML front matter + Ink syntax. See `docs/format-spec.md` for details.
 
+## Testing
+
+```bash
+node --test tests/*.test.mjs
+```
+
+## Security Notice
+
+API keys are stored in localStorage unencrypted. Do not use this app on shared or public devices.
+
 ## License
 
 MIT

@@ -400,11 +400,11 @@ export function parseScenario(source) {
 }
 
 /**
- * Генерирует уникальный ID для сценария
+ * Генерирует уникальный ID
  * @returns {string}
  */
 export function generateId() {
-    return 'scenario_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 export default { parseScenario, generateId };
