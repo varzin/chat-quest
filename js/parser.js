@@ -407,4 +407,7 @@ export function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
+// Internal exports for unit testing
+export { splitSource, parseYaml, validateConfig, parseInk };
+
 export default { parseScenario, generateId };
