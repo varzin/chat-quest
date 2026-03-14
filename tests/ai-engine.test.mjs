@@ -305,6 +305,98 @@ describe('AiEngine', () => {
         });
     });
 
+    describe('_detectPattern', () => {
+        it('should detect pattern when messages have similar structure', () => {
+            const engine = createEngine();
+            // All messages: similar length, 2 sentences, end with *action*
+            engine.addMessage({ speaker: 'char1', text: 'Sounds interesting, I like that idea. *smiles warmly*', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Tell me more', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Yeah that reminds me of something cool. *leans forward*', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Really?', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Of course, it was quite an experience. *nods slowly*', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Go on', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Well it changed my perspective on things. *looks away*', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'How so?', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Hard to explain but it felt really right. *pauses briefly*', isPlayer: false });
+
+            assert.equal(engine._detectPattern(), true);
+        });
+
+        it('should not detect pattern when messages vary', () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'char1', text: 'Hey!', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'I was thinking we could go to that new place downtown. The one with the rooftop terrace. What do you think about trying it out this weekend?', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Sure', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Cool. *grabs her jacket and heads for the door*', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Wait', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Hmm?', isPlayer: false });
+
+            assert.equal(engine._detectPattern(), false);
+        });
+
+        it('should return false when fewer than 3 AI messages', () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'char1', text: 'Hello there.', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'How are you?', isPlayer: false });
+
+            assert.equal(engine._detectPattern(), false);
+        });
+    });
+
+    describe('_rephrasePatternMessages', () => {
+        it('should call API and replace assistant messages', async () => {
+            global.fetch = async (_url, options) => {
+                const body = JSON.parse(options.body);
+                // Only respond to rephrase calls (system prompt contains "Rephrase")
+                if (body.messages[0].content.includes('Rephrase')) {
+                    return {
+                        ok: true,
+                        json: async () => ({
+                            choices: [{ message: { content: '1. Rephrased first\n2. Rephrased second' } }]
+                        })
+                    };
+                }
+                return {
+                    ok: true,
+                    json: async () => ({ choices: [{ message: { content: 'Bot reply' } }] })
+                };
+            };
+
+            const engine = createEngine();
+            const messages = [
+                { role: 'system', content: 'You are Alice' },
+                { role: 'user', content: 'Hi' },
+                { role: 'assistant', content: 'Original first' },
+                { role: 'user', content: 'Ok' },
+                { role: 'assistant', content: 'Original second' }
+            ];
+
+            const result = await engine._rephrasePatternMessages(messages);
+
+            assert.equal(result[2].content, 'Rephrased first');
+            assert.equal(result[4].content, 'Rephrased second');
+            // Non-assistant messages unchanged
+            assert.equal(result[0].content, 'You are Alice');
+            assert.equal(result[1].content, 'Hi');
+            assert.equal(result[3].content, 'Ok');
+        });
+
+        it('should return originals when API fails', async () => {
+            global.fetch = async () => ({ ok: false, status: 500 });
+
+            const engine = createEngine();
+            const messages = [
+                { role: 'system', content: 'prompt' },
+                { role: 'assistant', content: 'Original' }
+            ];
+
+            const result = await engine._rephrasePatternMessages(messages);
+            assert.equal(result[1].content, 'Original');
+        });
+    });
+
     describe('_detectLanguage', () => {
         it('should detect Russian text', () => {
             const engine = createEngine();
