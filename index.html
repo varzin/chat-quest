@@ -63,6 +63,10 @@
                         <i data-lucide="sparkles"></i>
                         <span data-i18n="changeModel">Сменить модель</span>
                     </button>
+                    <button class="chat__settings-item" id="btn-edit-character">
+                        <i data-lucide="user-pen"></i>
+                        <span data-i18n="editChatCharacter">Редактировать персонажа</span>
+                    </button>
                     <button class="chat__settings-item chat__settings-item--danger" id="btn-reset-chat">
                         <i data-lucide="refresh-cw"></i>
                         <span data-i18n="resetChat">Сбросить чат</span>
@@ -76,6 +80,11 @@
             <!-- Messages will be rendered here -->
         </div>
 
+        <!-- Scroll to Bottom -->
+        <button class="chat__scroll-bottom" id="btn-scroll-bottom" aria-label="Scroll to bottom">
+            <i data-lucide="chevron-down"></i>
+        </button>
+
         <!-- Choices Panel -->
         <div class="chat__bottom-bar chat__choices" id="choices">
             <div class="chat__bottom-bar-content" id="choices-content">
@@ -86,6 +95,9 @@
         <!-- AI Chat Input -->
         <div class="chat__bottom-bar chat__input" id="chat-input" hidden>
             <div class="chat__bottom-bar-content chat__input-content">
+                <button class="chat__format-btn" id="btn-format-asterisk" aria-label="Format with asterisks">
+                    <i data-lucide="asterisk"></i>
+                </button>
                 <textarea class="chat__input-field" id="chat-input-field" data-i18n-placeholder="messagePlaceholder" placeholder="Сообщение..." rows="1"></textarea>
                 <button class="chat__send-btn" id="btn-send" aria-label="Send">
                     <i data-lucide="send"></i>
@@ -105,15 +117,6 @@
             <div class="modal__header">
                 <h2 class="modal__title" id="editor-title" data-i18n="newChat">Новый чат</h2>
                 <div class="modal__header-actions">
-                    <button class="modal__icon-btn" id="editor-template" aria-label="Use template" title="Использовать шаблон" hidden>
-                        <i data-lucide="file-text"></i>
-                    </button>
-                    <button class="modal__icon-btn" id="editor-paste" aria-label="Paste from clipboard" title="Вставить из буфера" hidden>
-                        <i data-lucide="clipboard-paste"></i>
-                    </button>
-                    <button class="modal__icon-btn" id="editor-load-file" aria-label="Load file" title="Загрузить файл" hidden>
-                        <i data-lucide="upload"></i>
-                    </button>
                     <button class="modal__close" id="editor-close" aria-label="Close">
                         <i data-lucide="x"></i>
                     </button>
@@ -134,6 +137,20 @@
 
             <!-- Tab: Scenario -->
             <div class="editor-tab-content is-active" id="editor-tab-scenario">
+                <div class="editor-actions" id="editor-actions">
+                    <button class="editor-actions__btn" id="editor-template" aria-label="Use template">
+                        <i data-lucide="file-text"></i>
+                        <span data-i18n="useTemplate">Шаблон</span>
+                    </button>
+                    <button class="editor-actions__btn" id="editor-paste" aria-label="Paste from clipboard">
+                        <i data-lucide="clipboard-paste"></i>
+                        <span data-i18n="paste">Вставить</span>
+                    </button>
+                    <button class="editor-actions__btn" id="editor-load-file" aria-label="Load file">
+                        <i data-lucide="upload"></i>
+                        <span data-i18n="loadFile">Загрузить</span>
+                    </button>
+                </div>
                 <div class="modal__body">
                     <textarea class="modal__textarea" id="editor-textarea" placeholder="YAML + Ink код сценария..."></textarea>
                     <div class="modal__error" id="editor-error" hidden></div>

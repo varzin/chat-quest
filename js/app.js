@@ -184,6 +184,16 @@ class ChatQuestApp {
         this.ui.on('onCharacterSave', (character) => {
             storage.saveCharacter(character);
             this.ui.renderCharacters(storage.getCharacters());
+
+            // Update running AI engine if editing current chat's character
+            if (this.aiEngine && this.currentAiChatId) {
+                const chatData = storage.getAiChat(this.currentAiChatId);
+                if (chatData && chatData.characterId === character.id) {
+                    this.aiEngine.systemPrompt = character.prompt || '';
+                    this.aiEngine.characterName = character.name;
+                    this.ui.setChatHeader(chatData.title || character.name, chatData.model);
+                }
+            }
         });
 
         this.ui.on('onCharacterDelete', async (id, name) => {
@@ -224,6 +234,16 @@ class ChatQuestApp {
 
         this.ui.on('onChangeModel', (provider, model) => {
             this._changeAiChatModel(provider, model);
+        });
+
+        this.ui.on('onEditCharacter', () => {
+            if (!this.aiEngine || !this.currentAiChatId) return;
+            const chatData = storage.getAiChat(this.currentAiChatId);
+            if (!chatData) return;
+            const characters = storage.getCharacters();
+            const character = characters.find(c => c.id === chatData.characterId);
+            if (!character) return;
+            this.ui.openCharacterEditor(character);
         });
     }
 

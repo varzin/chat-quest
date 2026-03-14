@@ -84,6 +84,7 @@ const translations = {
         chatSettings: 'Настройки чата',
         resetChat: 'Сбросить чат',
         changeModel: 'Сменить модель',
+        editChatCharacter: 'Редактировать персонажа',
 
         // AI Chat Setup
         chatTitle: 'Название чата',
@@ -181,6 +182,7 @@ const translations = {
         chatSettings: 'Chat settings',
         resetChat: 'Reset chat',
         changeModel: 'Change model',
+        editChatCharacter: 'Edit character',
 
         // AI Chat Setup
         chatTitle: 'Chat title',

@@ -84,6 +84,10 @@ class UIController {
             chatInput: document.getElementById('chat-input'),
             chatInputField: document.getElementById('chat-input-field'),
             btnSend: document.getElementById('btn-send'),
+            btnFormatAsterisk: document.getElementById('btn-format-asterisk'),
+
+            // Scroll to bottom
+            btnScrollBottom: document.getElementById('btn-scroll-bottom'),
 
             // Chat Settings Menu
             chatSettingsWrap: document.getElementById('chat-settings-wrap'),
@@ -91,6 +95,7 @@ class UIController {
             chatSettingsMenu: document.getElementById('chat-settings-menu'),
             btnResetChat: document.getElementById('btn-reset-chat'),
             btnChangeModel: document.getElementById('btn-change-model'),
+            btnEditCharacter: document.getElementById('btn-edit-character'),
 
             // Model Picker Modal
             modelPickerModal: document.getElementById('model-picker-modal'),
@@ -129,7 +134,8 @@ class UIController {
             onAiChatSelect: null,
             onAiChatDelete: null,
             onSendMessage: null,
-            onChangeModel: null
+            onChangeModel: null,
+            onEditCharacter: null
         };
 
         this._confirmResolve = null;
@@ -171,7 +177,30 @@ class UIController {
             this._closeChatSettingsMenu();
             this._openModelPicker();
         });
+        this.elements.btnEditCharacter.addEventListener('click', () => {
+            this._closeChatSettingsMenu();
+            this.callbacks.onEditCharacter?.();
+        });
         document.addEventListener('click', () => this._closeChatSettingsMenu());
+
+        // Scroll to bottom button
+        this.elements.messages.addEventListener('scroll', () => {
+            this._updateScrollBottomButton();
+        }, { passive: true });
+        this.elements.btnScrollBottom.addEventListener('click', () => {
+            this._scrollToBottom();
+            this.elements.btnScrollBottom.classList.remove('is-visible');
+        });
+
+        // Visual viewport tracking for mobile keyboard
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', () => {
+                document.documentElement.style.setProperty(
+                    '--visual-viewport-height',
+                    window.visualViewport.height + 'px'
+                );
+            });
+        }
 
         // Model Picker Modal
         this.elements.modelPickerClose.addEventListener('click', () => this._closeModelPicker());
@@ -389,6 +418,26 @@ class UIController {
             const field = this.elements.chatInputField;
             field.style.height = 'auto';
             field.style.height = Math.min(field.scrollHeight, 120) + 'px';
+        });
+
+        // Asterisk formatting button
+        this.elements.btnFormatAsterisk?.addEventListener('click', () => {
+            const field = this.elements.chatInputField;
+            const start = field.selectionStart;
+            const end = field.selectionEnd;
+            const value = field.value;
+
+            if (start === end) {
+                field.value = value.slice(0, start) + '**' + value.slice(start);
+                field.selectionStart = field.selectionEnd = start + 1;
+            } else {
+                const selected = value.slice(start, end);
+                field.value = value.slice(0, start) + '*' + selected + '*' + value.slice(end);
+                field.selectionStart = start + 1;
+                field.selectionEnd = end + 1;
+            }
+            field.focus();
+            field.dispatchEvent(new Event('input'));
         });
     }
 
@@ -801,9 +850,6 @@ class UIController {
 
         this.elements.editorTextarea.value = source;
         this.elements.editorError.hidden = true;
-        this.elements.editorTemplate.hidden = !isNew;
-        this.elements.editorPaste.hidden = !isNew && !source;
-        this.elements.editorLoadFile.hidden = !isNew && !source;
         this._showModal(this.elements.editorModal);
 
         // Фокус на textarea
@@ -999,11 +1045,6 @@ class UIController {
      */
     _switchEditorTab(tabName) {
         this._switchTab('.editor-tabs__btn', 'editor-tab', tabName);
-
-        const isScenario = tabName === 'scenario';
-        this.elements.editorTemplate.hidden = !isScenario;
-        this.elements.editorPaste.hidden = !isScenario;
-        this.elements.editorLoadFile.hidden = !isScenario;
 
         if (tabName === 'ai-chat') {
             this._populateAiChatSetup();
@@ -1254,6 +1295,21 @@ class UIController {
         requestAnimationFrame(() => {
             this.elements.messages.scrollTop = this.elements.messages.scrollHeight;
         });
+        this.elements.btnScrollBottom?.classList.remove('is-visible');
+    }
+
+    _updateScrollBottomButton() {
+        const el = this.elements.messages;
+        const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
+        this.elements.btnScrollBottom?.classList.toggle('is-visible', !isNearBottom);
+    }
+
+    /**
+     * Открывает редактор персонажа (публичный метод для вызова из app.js)
+     * @param {Object} character - { id, name, prompt }
+     */
+    openCharacterEditor(character) {
+        this._openCharacterModal(character);
     }
 
     /**
