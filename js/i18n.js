@@ -80,6 +80,11 @@ const translations = {
         confirmDeleteChat: 'Удалить чат с "{name}"?',
         confirmRestartChat: 'Очистить историю чата?',
 
+        // Chat Settings Menu
+        chatSettings: 'Настройки чата',
+        resetChat: 'Сбросить чат',
+        changeModel: 'Сменить модель',
+
         // AI Chat Setup
         chatTitle: 'Название чата',
         chatTitlePlaceholder: 'Необязательно...',
@@ -171,6 +176,11 @@ const translations = {
         confirmDeleteCharacter: 'Delete character "{name}"?',
         confirmDeleteChat: 'Delete chat with "{name}"?',
         confirmRestartChat: 'Clear chat history?',
+
+        // Chat Settings Menu
+        chatSettings: 'Chat settings',
+        resetChat: 'Reset chat',
+        changeModel: 'Change model',
 
         // AI Chat Setup
         chatTitle: 'Chat title',

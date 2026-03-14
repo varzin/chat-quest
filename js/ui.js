@@ -85,6 +85,20 @@ class UIController {
             chatInputField: document.getElementById('chat-input-field'),
             btnSend: document.getElementById('btn-send'),
 
+            // Chat Settings Menu
+            chatSettingsWrap: document.getElementById('chat-settings-wrap'),
+            btnChatSettings: document.getElementById('btn-chat-settings'),
+            chatSettingsMenu: document.getElementById('chat-settings-menu'),
+            btnResetChat: document.getElementById('btn-reset-chat'),
+            btnChangeModel: document.getElementById('btn-change-model'),
+
+            // Model Picker Modal
+            modelPickerModal: document.getElementById('model-picker-modal'),
+            modelPickerSelect: document.getElementById('model-picker-select'),
+            modelPickerClose: document.getElementById('model-picker-close'),
+            modelPickerCancel: document.getElementById('model-picker-cancel'),
+            modelPickerApply: document.getElementById('model-picker-apply'),
+
             // Confirm Modal
             confirmModal: document.getElementById('confirm-modal'),
             confirmTitle: document.getElementById('confirm-title'),
@@ -114,7 +128,8 @@ class UIController {
             onStartAiChat: null,
             onAiChatSelect: null,
             onAiChatDelete: null,
-            onSendMessage: null
+            onSendMessage: null,
+            onChangeModel: null
         };
 
         this._confirmResolve = null;
@@ -141,6 +156,33 @@ class UIController {
         // Chat
         this.elements.btnRestart.addEventListener('click', () => {
             this.callbacks.onRestart?.();
+        });
+
+        // Chat Settings Menu
+        this.elements.btnChatSettings.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this._toggleChatSettingsMenu();
+        });
+        this.elements.btnResetChat.addEventListener('click', () => {
+            this._closeChatSettingsMenu();
+            this.callbacks.onRestart?.();
+        });
+        this.elements.btnChangeModel.addEventListener('click', () => {
+            this._closeChatSettingsMenu();
+            this._openModelPicker();
+        });
+        document.addEventListener('click', () => this._closeChatSettingsMenu());
+
+        // Model Picker Modal
+        this.elements.modelPickerClose.addEventListener('click', () => this._closeModelPicker());
+        this.elements.modelPickerCancel.addEventListener('click', () => this._closeModelPicker());
+        this.elements.modelPickerApply.addEventListener('click', () => {
+            const value = this.elements.modelPickerSelect.value;
+            if (value) {
+                const [provider, model] = value.split(':');
+                this.callbacks.onChangeModel?.(provider, model);
+            }
+            this._closeModelPicker();
         });
     }
 
@@ -528,6 +570,58 @@ class UIController {
      */
     setRestartVisible(visible) {
         this.elements.btnRestart.style.display = visible ? 'flex' : 'none';
+    }
+
+    /**
+     * Показывает кнопку настроек чата (AI chat mode)
+     */
+    showChatSettings() {
+        this.elements.chatSettingsWrap.hidden = false;
+        this.elements.btnRestart.style.display = 'none';
+    }
+
+    /**
+     * Скрывает кнопку настроек чата
+     */
+    hideChatSettings() {
+        this.elements.chatSettingsWrap.hidden = true;
+        this._closeChatSettingsMenu();
+    }
+
+    _toggleChatSettingsMenu() {
+        const menu = this.elements.chatSettingsMenu;
+        menu.hidden = !menu.hidden;
+    }
+
+    _closeChatSettingsMenu() {
+        this.elements.chatSettingsMenu.hidden = true;
+    }
+
+    _openModelPicker() {
+        this._populateModelPicker();
+        this.elements.modelPickerModal.hidden = false;
+        lucide.createIcons();
+    }
+
+    _closeModelPicker() {
+        this.elements.modelPickerModal.hidden = true;
+    }
+
+    _populateModelPicker() {
+        const select = this.elements.modelPickerSelect;
+        select.innerHTML = '';
+        const groups = this._getModelGroups();
+        groups.forEach(group => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = group.label;
+            group.models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.value;
+                opt.textContent = m.label;
+                optgroup.appendChild(opt);
+            });
+            select.appendChild(optgroup);
+        });
     }
 
     // ========================================
@@ -926,6 +1020,32 @@ class UIController {
         this._aiChatCharacters = characters;
     }
 
+    _getModelGroups() {
+        const apiKeys = this._aiChatApiKeys || {};
+        const groups = [];
+        if (apiKeys.grok) {
+            groups.push({
+                label: 'xAI',
+                models: [
+                    { value: 'grok:grok-3-mini', label: 'Grok 3 Mini — fast · $0.3/$0.5' },
+                    { value: 'grok:grok-3',      label: 'Grok 3 — smart · $3/$15' },
+                ]
+            });
+        }
+        if (apiKeys.openai) {
+            groups.push({
+                label: 'OpenAI',
+                models: [
+                    { value: 'openai:gpt-4.1-nano',  label: 'GPT-4.1 Nano — fast · $0.1/$0.4' },
+                    { value: 'openai:gpt-4o-mini',    label: 'GPT-4o Mini — fast · $0.15/$0.6' },
+                    { value: 'openai:gpt-4.1-mini',   label: 'GPT-4.1 Mini — balanced · $0.4/$1.6' },
+                    { value: 'openai:gpt-4.1',        label: 'GPT-4.1 — smart · $2/$8' },
+                ]
+            });
+        }
+        return groups;
+    }
+
     _populateAiChatSetup() {
         const apiKeys = this._aiChatApiKeys || {};
         const characters = this._aiChatCharacters || [];
@@ -948,27 +1068,7 @@ class UIController {
             this.elements.aiChatCharacter.appendChild(opt);
         });
 
-        const providerGroups = [];
-        if (apiKeys.openai) {
-            providerGroups.push({
-                label: 'OpenAI',
-                models: [
-                    { value: 'openai:gpt-4.1-nano',  label: 'GPT-4.1 Nano — fast · $0.1/$0.4' },
-                    { value: 'openai:gpt-4o-mini',    label: 'GPT-4o Mini — fast · $0.15/$0.6' },
-                    { value: 'openai:gpt-4.1-mini',   label: 'GPT-4.1 Mini — balanced · $0.4/$1.6' },
-                    { value: 'openai:gpt-4.1',        label: 'GPT-4.1 — smart · $2/$8' },
-                ]
-            });
-        }
-        if (apiKeys.grok) {
-            providerGroups.push({
-                label: 'xAI',
-                models: [
-                    { value: 'grok:grok-3-mini', label: 'Grok 3 Mini — fast · $0.3/$0.5' },
-                    { value: 'grok:grok-3',      label: 'Grok 3 — smart · $3/$15' },
-                ]
-            });
-        }
+        const providerGroups = this._getModelGroups();
         this.elements.aiChatModel.innerHTML = '';
         providerGroups.forEach(group => {
             const optgroup = document.createElement('optgroup');

@@ -54,6 +54,21 @@
             <button class="chat__restart-btn" id="btn-restart" aria-label="Restart scenario">
                 <i data-lucide="refresh-cw"></i>
             </button>
+            <div class="chat__settings-wrap" id="chat-settings-wrap" hidden>
+                <button class="chat__settings-btn" id="btn-chat-settings" aria-label="Chat settings">
+                    <i data-lucide="ellipsis-vertical"></i>
+                </button>
+                <div class="chat__settings-menu" id="chat-settings-menu" hidden>
+                    <button class="chat__settings-item" id="btn-change-model">
+                        <i data-lucide="sparkles"></i>
+                        <span data-i18n="changeModel">Сменить модель</span>
+                    </button>
+                    <button class="chat__settings-item chat__settings-item--danger" id="btn-reset-chat">
+                        <i data-lucide="refresh-cw"></i>
+                        <span data-i18n="resetChat">Сбросить чат</span>
+                    </button>
+                </div>
+            </div>
         </header>
 
         <!-- Messages Container -->
@@ -220,19 +235,19 @@
                     <div class="settings-item">
                         <label class="settings-item__label" data-i18n="theme">Тема</label>
                         <div class="theme-selector">
-                            <input type="radio" name="theme" id="theme-default" value="default" class="theme-selector__input">
-                            <label for="theme-default" class="theme-selector__option">
-                                <span class="theme-selector__icon">
-                                    <i data-lucide="sun"></i>
-                                </span>
-                                <span class="theme-selector__label" data-i18n="themeDefault">Стандартная</span>
-                            </label>
                             <input type="radio" name="theme" id="theme-neutral" value="neutral" class="theme-selector__input">
                             <label for="theme-neutral" class="theme-selector__option">
                                 <span class="theme-selector__icon">
                                     <i data-lucide="contrast"></i>
                                 </span>
                                 <span class="theme-selector__label" data-i18n="themeNeutral">Нейтральная</span>
+                            </label>
+                            <input type="radio" name="theme" id="theme-default" value="default" class="theme-selector__input">
+                            <label for="theme-default" class="theme-selector__option">
+                                <span class="theme-selector__icon">
+                                    <i data-lucide="sun"></i>
+                                </span>
+                                <span class="theme-selector__label" data-i18n="themeDefault">Стандартная</span>
                             </label>
                             <input type="radio" name="theme" id="theme-low-contrast" value="low-contrast" class="theme-selector__input">
                             <label for="theme-low-contrast" class="theme-selector__option">
@@ -381,6 +396,30 @@
             <div class="modal__footer">
                 <button class="modal__btn modal__btn--secondary" id="confirm-cancel" data-i18n="cancel">Отмена</button>
                 <button class="modal__btn modal__btn--danger" id="confirm-ok" data-i18n="confirm">Подтвердить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Picker Modal -->
+    <div class="modal modal--overlay" id="model-picker-modal" hidden>
+        <div class="modal__content modal__content--small">
+            <div class="modal__header">
+                <h2 class="modal__title" data-i18n="changeModel">Сменить модель</h2>
+                <button class="modal__close" id="model-picker-close" aria-label="Close">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal__body">
+                <div class="settings-item">
+                    <div class="language-selector">
+                        <select class="language-selector__select" id="model-picker-select"></select>
+                        <i class="language-selector__icon" data-lucide="chevron-down"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="modal__footer">
+                <button class="modal__btn modal__btn--secondary" id="model-picker-cancel" data-i18n="cancel">Отмена</button>
+                <button class="modal__btn modal__btn--primary" id="model-picker-apply" data-i18n="save">Сохранить</button>
             </div>
         </div>
     </div>

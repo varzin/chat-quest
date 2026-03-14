@@ -221,6 +221,10 @@ class ChatQuestApp {
         });
 
         this.ui.on('onSendMessage', (text) => this._handleSendMessage(text));
+
+        this.ui.on('onChangeModel', (provider, model) => {
+            this._changeAiChatModel(provider, model);
+        });
     }
 
     // ========================================
@@ -239,6 +243,8 @@ class ChatQuestApp {
             this._resetCurrentMode();
             this.ui.hideInputBar();
             this.ui.hideChoices();
+            this.ui.hideChatSettings();
+            this.ui.setRestartVisible(false);
             this.ui.showEmptyState();
             this.ui.setChatHeader('Chat Quest');
         }
@@ -355,6 +361,7 @@ class ChatQuestApp {
             // Обновляем UI
             this.ui.setChatHeader(this.engine.getTitle());
             this.ui.setRestartVisible(this.engine.allowRestart());
+            this.ui.hideChatSettings();
             this.ui.hideEmptyState();
             this.ui.hideInputBar();
             this._refreshSidebarList();
@@ -528,7 +535,7 @@ class ChatQuestApp {
         // Обновляем UI
         this.ui.clearMessages();
         this.ui.setChatHeader(chatTitle, model);
-        this.ui.setRestartVisible(true);
+        this.ui.showChatSettings();
         this.ui.hideEmptyState();
         this.ui.hideChoices();
         this.ui.showInputBar();
@@ -585,7 +592,7 @@ class ChatQuestApp {
 
         // Обновляем UI
         this.ui.setChatHeader(chatData.title || chatData.characterName, chatData.model);
-        this.ui.setRestartVisible(true);
+        this.ui.showChatSettings();
         this.ui.hideEmptyState();
         this.ui.hideChoices();
         this.ui.showInputBar();
@@ -646,6 +653,30 @@ class ChatQuestApp {
             chatData.messages = state.displayedMessages;
             storage.saveAiChat(this.currentAiChatId, chatData);
         }
+    }
+
+    _changeAiChatModel(provider, model) {
+        if (!this.aiEngine || !this.currentAiChatId) return;
+
+        const apiKeys = storage.getApiKeys();
+        const apiKey = provider === 'openai' ? apiKeys.openai : apiKeys.grok;
+        if (!apiKey) return;
+
+        this.aiEngine.provider = provider;
+        this.aiEngine.model = model;
+        this.aiEngine.apiKey = apiKey;
+
+        const chatData = storage.getAiChat(this.currentAiChatId);
+        if (chatData) {
+            chatData.provider = provider;
+            chatData.model = model;
+            storage.saveAiChat(this.currentAiChatId, chatData);
+        }
+
+        this.ui.setChatHeader(
+            chatData?.title || chatData?.characterName || '',
+            model
+        );
     }
 
     // ========================================

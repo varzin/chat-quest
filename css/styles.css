@@ -623,6 +623,84 @@ input, textarea, select {
     box-shadow: var(--shadow-glow);
 }
 
+/* Chat Settings Dropdown */
+.chat__settings-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.chat__settings-btn {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent-purple);
+    border-radius: var(--border-radius-full);
+    transition: all var(--transition-fast);
+}
+
+.chat__settings-btn:hover {
+    background: var(--bg-glass);
+    box-shadow: var(--shadow-glow);
+}
+
+.chat__settings-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    min-width: 200px;
+    background: var(--bg-secondary);
+    backdrop-filter: blur(var(--blur-lg));
+    -webkit-backdrop-filter: blur(var(--blur-lg));
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+    padding: var(--spacing-xs) 0;
+    animation: menuAppear 0.15s ease both;
+}
+
+@keyframes menuAppear {
+    from {
+        opacity: 0;
+        transform: translateY(-8px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.chat__settings-item {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: 10px 16px;
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    transition: background var(--transition-fast);
+    text-align: left;
+}
+
+.chat__settings-item:hover {
+    background: var(--bg-glass);
+}
+
+.chat__settings-item i,
+.chat__settings-item svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    color: var(--accent-purple);
+}
+
+.chat__settings-item--danger i,
+.chat__settings-item--danger svg {
+    color: var(--accent-pink);
+}
+
 .chat__header-info {
     flex: 1;
     min-width: 0;
@@ -2158,6 +2236,42 @@ input, textarea, select {
 /* ========================================
    Media Queries
    ======================================== */
+@media (max-width: 767px) {
+    .message {
+        max-width: 90%;
+        flex-direction: column;
+    }
+
+    .message--player {
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .message--npc {
+        align-items: flex-start;
+    }
+
+    .message__avatar {
+        order: 1;
+        width: 24px;
+        height: 24px;
+        align-self: auto;
+    }
+
+    .message__avatar .avatar-initial {
+        font-size: 12px;
+    }
+
+    .typing-indicator__avatar {
+        width: 24px;
+        height: 24px;
+    }
+
+    .message--continuation .message__avatar {
+        display: none;
+    }
+}
+
 @media (min-width: 768px) {
     .sidebar {
         width: var(--sidebar-width);
