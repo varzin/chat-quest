@@ -584,7 +584,7 @@ class UIController {
             <div class="message__avatar">${avatarHtml}</div>
             <div class="message__content">
                 ${nameHtml}
-                <div class="message__bubble">${this._escapeHtml(message.text)}</div>
+                <div class="message__bubble">${this._formatMessageText(message.text)}</div>
             </div>
         `;
 
@@ -1161,6 +1161,11 @@ class UIController {
      * @param {string} str
      * @returns {string}
      */
+    _formatMessageText(text) {
+        const escaped = this._escapeHtml(text);
+        return escaped.replace(/\*([^*]+)\*/g, '<span class="message__action">$1</span>');
+    }
+
     _escapeHtml(str) {
         const div = document.createElement('div');
         div.textContent = str;

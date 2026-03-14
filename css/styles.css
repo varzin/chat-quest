@@ -763,6 +763,11 @@ input, textarea, select {
     box-shadow: var(--glow-message), var(--shadow-md);
 }
 
+.message__action {
+    font-style: italic;
+    opacity: 0.6;
+}
+
 /* Message timestamp */
 .message__meta {
     display: flex;
