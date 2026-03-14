@@ -115,11 +115,26 @@ describe('AiEngine', () => {
         });
     });
 
-    describe('sendMessage - context window limit', () => {
-        it('should limit history to last 50 messages', async () => {
-            const engine = createEngine();
+    describe('sendMessage - token budget context limit', () => {
+        it('should limit history by token budget, not fixed message count', async () => {
+            // Capture only the first fetch call (main request, not summarization)
+            let mainRequestBody = null;
+            global.fetch = async (_url, options) => {
+                const body = JSON.parse(options.body);
+                if (!mainRequestBody) mainRequestBody = body;
+                return {
+                    ok: true,
+                    json: async () => ({
+                        choices: [{ message: { content: 'Bot reply' } }]
+                    })
+                };
+            };
 
-            // Add 60 messages
+            const engine = createEngine({
+                globalSettings: { historyTokenBudget: 100 }
+            });
+
+            // Add many short messages (~2 tokens each: "msg-XX" = ~6 chars = ~1.5 tokens)
             for (let i = 0; i < 60; i++) {
                 engine.addMessage({
                     speaker: i % 2 === 0 ? 'player' : 'char1',
@@ -130,11 +145,138 @@ describe('AiEngine', () => {
 
             await engine.sendMessage('msg-59');
 
-            // system + last 50 messages = 51
-            assert.equal(lastRequestBody.messages.length, 51);
+            // With budget=100 tokens and ~1.5 tokens/msg, should fit ~60 messages
+            assert.equal(mainRequestBody.messages[0].role, 'system');
+            // Last message should be the most recent
+            const lastMsg = mainRequestBody.messages[mainRequestBody.messages.length - 1];
+            assert.equal(lastMsg.content, 'msg-59');
+        });
+
+        it('should truncate old messages when budget is small', async () => {
+            let mainRequestBody = null;
+            global.fetch = async (_url, options) => {
+                const body = JSON.parse(options.body);
+                if (!mainRequestBody) mainRequestBody = body;
+                return {
+                    ok: true,
+                    json: async () => ({
+                        choices: [{ message: { content: 'Bot reply' } }]
+                    })
+                };
+            };
+
+            const engine = createEngine({
+                globalSettings: { historyTokenBudget: 20 }
+            });
+
+            // Add messages with ~10 tokens each (~40 chars)
+            for (let i = 0; i < 10; i++) {
+                engine.addMessage({
+                    speaker: i % 2 === 0 ? 'player' : 'char1',
+                    text: `This is a longer message number ${i} with more text`,
+                    isPlayer: i % 2 === 0
+                });
+            }
+
+            await engine.sendMessage('last');
+
+            // Should have fewer than 10 history messages due to budget
+            const historyCount = mainRequestBody.messages.length - 1; // minus system
+            assert.ok(historyCount < 10,
+                `Expected fewer than 10 history messages, got ${historyCount}`);
+            assert.ok(historyCount > 0, 'Should have at least 1 history message');
+        });
+    });
+
+    describe('_estimateTokens', () => {
+        it('should estimate ASCII text at ~4 chars per token', () => {
+            const engine = createEngine();
+            // 40 ASCII chars → ~10 tokens
+            const tokens = engine._estimateTokens('a'.repeat(40));
+            assert.equal(tokens, 10);
+        });
+
+        it('should estimate Cyrillic text at ~2 chars per token', () => {
+            const engine = createEngine();
+            // 20 Cyrillic chars → ~10 tokens
+            const tokens = engine._estimateTokens('а'.repeat(20));
+            assert.equal(tokens, 10);
+        });
+
+        it('should handle mixed text', () => {
+            const engine = createEngine();
+            // 8 ASCII + 4 Cyrillic = 8/4 + 4/2 = 2 + 2 = 4
+            const tokens = engine._estimateTokens('Hello!!!Привет');
+            // "Hello!!!" = 8 ASCII, "Привет" = 6 Cyrillic
+            // 8/4 + 6/2 = 2 + 3 = 5
+            assert.equal(tokens, 5);
+        });
+    });
+
+    describe('summary in context', () => {
+        it('should include summary as second system message when present', async () => {
+            const engine = createEngine();
+            engine._summary = 'Player discussed weather with Alice.';
+            engine.addMessage({ speaker: 'player', text: 'Hi again', isPlayer: true });
+
+            await engine.sendMessage('Hi again');
+
             assert.equal(lastRequestBody.messages[0].role, 'system');
-            // First history message should be msg-10 (skipping 0-9)
-            assert.equal(lastRequestBody.messages[1].content, 'msg-10');
+            assert.equal(lastRequestBody.messages[0].content, 'You are Alice');
+            assert.equal(lastRequestBody.messages[1].role, 'system');
+            assert.ok(lastRequestBody.messages[1].content.includes('Player discussed weather'));
+            assert.equal(lastRequestBody.messages[2].role, 'user');
+            assert.equal(lastRequestBody.messages[2].content, 'Hi again');
+        });
+
+        it('should not include summary message when no summary exists', async () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+
+            await engine.sendMessage('Hi');
+
+            const systemMessages = lastRequestBody.messages.filter(m => m.role === 'system');
+            assert.equal(systemMessages.length, 1);
+        });
+    });
+
+    describe('state management', () => {
+        it('should save and restore state including summary', () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Hello', isPlayer: false });
+            engine._summary = 'Test summary';
+            engine._summaryUpToIndex = 5;
+
+            const state = engine.getState();
+            const engine2 = createEngine();
+            engine2.restore(state);
+
+            assert.equal(engine2.displayedMessages.length, 2);
+            assert.equal(engine2.displayedMessages[0].text, 'Hi');
+            assert.equal(engine2._summary, 'Test summary');
+            assert.equal(engine2._summaryUpToIndex, 5);
+        });
+
+        it('should restore without summary gracefully', () => {
+            const engine = createEngine();
+            engine.restore({ displayedMessages: [{ text: 'Hi', isPlayer: true }] });
+
+            assert.equal(engine._summary, null);
+            assert.equal(engine._summaryUpToIndex, 0);
+        });
+
+        it('should reset messages and summary', () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+            engine._summary = 'Old summary';
+            engine._summaryUpToIndex = 10;
+            engine.reset();
+
+            assert.equal(engine.displayedMessages.length, 0);
+            assert.equal(engine._summary, null);
+            assert.equal(engine._summaryUpToIndex, 0);
+            assert.equal(engine._isSummarizing, false);
         });
     });
 
@@ -163,26 +305,15 @@ describe('AiEngine', () => {
         });
     });
 
-    describe('state management', () => {
-        it('should save and restore state', () => {
+    describe('_detectLanguage', () => {
+        it('should detect Russian text', () => {
             const engine = createEngine();
-            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
-            engine.addMessage({ speaker: 'char1', text: 'Hello', isPlayer: false });
-
-            const state = engine.getState();
-            const engine2 = createEngine();
-            engine2.restore(state);
-
-            assert.equal(engine2.displayedMessages.length, 2);
-            assert.equal(engine2.displayedMessages[0].text, 'Hi');
+            assert.equal(engine._detectLanguage('Привет, как дела?'), 'ru');
         });
 
-        it('should reset messages', () => {
+        it('should detect English text', () => {
             const engine = createEngine();
-            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
-            engine.reset();
-
-            assert.equal(engine.displayedMessages.length, 0);
+            assert.equal(engine._detectLanguage('Hello, how are you?'), 'en');
         });
     });
 });
