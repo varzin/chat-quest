@@ -128,7 +128,23 @@ class UIController {
      * Привязывает обработчики событий
      */
     _bindEvents() {
-        // Sidebar
+        this._bindSidebarEvents();
+        this._bindEditorEvents();
+        this._bindSettingsEvents();
+        this._bindTabEvents();
+        this._bindApiKeyEvents();
+        this._bindCharacterEvents();
+        this._bindAiChatEvents();
+        this._bindChatInputEvents();
+        this._bindModalEvents();
+
+        // Chat
+        this.elements.btnRestart.addEventListener('click', () => {
+            this.callbacks.onRestart?.();
+        });
+    }
+
+    _bindSidebarEvents() {
         this.elements.btnMenu.addEventListener('click', () => this.openSidebar());
         this.elements.sidebarClose.addEventListener('click', () => this.closeSidebar());
         this.elements.sidebarOverlay.addEventListener('click', () => this.closeSidebar());
@@ -138,13 +154,9 @@ class UIController {
         });
 
         this.elements.btnSettings.addEventListener('click', () => this.openSettings());
+    }
 
-        // Chat
-        this.elements.btnRestart.addEventListener('click', () => {
-            this.callbacks.onRestart?.();
-        });
-
-        // Editor Modal
+    _bindEditorEvents() {
         this.elements.editorClose.addEventListener('click', () => this.closeEditor());
         this.elements.editorCancel.addEventListener('click', () => this.closeEditor());
         this.elements.editorSave.addEventListener('click', () => {
@@ -185,11 +197,11 @@ class UIController {
                 this.closeEditor();
             }
         });
+    }
 
-        // Settings Modal
+    _bindSettingsEvents() {
         this.elements.settingsClose.addEventListener('click', () => this.closeSettings());
 
-        // Theme selector (radio buttons sync with select)
         document.querySelectorAll('input[name="theme"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
                 this.elements.settingsTheme.value = e.target.value;
@@ -201,13 +213,11 @@ class UIController {
             this.callbacks.onThemeChange?.(e.target.value);
         });
 
-        // Custom slider for typing min
         this._setupSlider('settings-typing-min', 200, 2000, (value) => {
             const max = parseInt(this.elements.settingsTypingMax.value) || 1600;
             this.callbacks.onTypingDelayChange?.(value, max);
         });
 
-        // Custom slider for typing max
         this._setupSlider('settings-typing-max', 400, 5000, (value) => {
             const min = parseInt(this.elements.settingsTypingMin.value) || 400;
             this.callbacks.onTypingDelayChange?.(min, value);
@@ -219,15 +229,9 @@ class UIController {
         this.elements.btnClearData.addEventListener('click', () => {
             this.callbacks.onClearData?.();
         });
+    }
 
-        // Settings Tabs
-        document.querySelectorAll('.settings-tabs__btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this._switchSettingsTab(btn.dataset.tab);
-            });
-        });
-
-        // API Keys - save on blur/change
+    _bindApiKeyEvents() {
         [this.elements.apiKeyOpenai, this.elements.apiKeyGrok].forEach(input => {
             if (!input) return;
             input.addEventListener('change', () => {
@@ -236,7 +240,6 @@ class UIController {
             });
         });
 
-        // API Key toggle visibility buttons
         document.querySelectorAll('.api-key-field__toggle').forEach(btn => {
             btn.addEventListener('click', () => {
                 const input = document.getElementById(btn.dataset.target);
@@ -252,7 +255,6 @@ class UIController {
             });
         });
 
-        // API Key clear buttons
         document.querySelectorAll('.api-key-field__clear').forEach(btn => {
             btn.addEventListener('click', () => {
                 const input = document.getElementById(btn.dataset.target);
@@ -263,14 +265,15 @@ class UIController {
                 }
             });
         });
+    }
 
-        // Characters
+    _bindCharacterEvents() {
         this.elements.btnAddCharacter?.addEventListener('click', () => {
             this._openCharacterModal(null);
         });
 
         const closeCharacterModal = () => {
-            this.elements.characterModal.hidden = true;
+            this._hideModal(this.elements.characterModal);
             this._editingCharacterId = null;
         };
 
@@ -286,18 +289,26 @@ class UIController {
                 name,
                 prompt
             });
-            this.elements.characterModal.hidden = true;
+            this._hideModal(this.elements.characterModal);
             this._editingCharacterId = null;
         });
+    }
 
-        // Editor Tabs
+    _bindTabEvents() {
         document.querySelectorAll('.editor-tabs__btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 this._switchEditorTab(btn.dataset.tab);
             });
         });
 
-        // AI Chat Setup
+        document.querySelectorAll('.settings-tabs__btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this._switchSettingsTab(btn.dataset.tab);
+            });
+        });
+    }
+
+    _bindAiChatEvents() {
         this.elements.aiChatCancel?.addEventListener('click', () => this.closeEditor());
         this.elements.aiChatStart?.addEventListener('click', () => {
             const title = this.elements.aiChatTitle.value.trim();
@@ -321,8 +332,9 @@ class UIController {
             this.openSettings();
             this._switchSettingsTab('characters');
         });
+    }
 
-        // Chat Input
+    _bindChatInputEvents() {
         this.elements.btnSend?.addEventListener('click', () => this._sendInputMessage());
         this.elements.chatInputField?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -331,14 +343,14 @@ class UIController {
             }
         });
 
-        // Auto-resize textarea
         this.elements.chatInputField?.addEventListener('input', () => {
             const field = this.elements.chatInputField;
             field.style.height = 'auto';
             field.style.height = Math.min(field.scrollHeight, 120) + 'px';
         });
+    }
 
-        // Confirm Modal
+    _bindModalEvents() {
         this.elements.confirmCancel.addEventListener('click', () => {
             this._confirmResolve?.(false);
             this.closeConfirm();
@@ -348,7 +360,6 @@ class UIController {
             this.closeConfirm();
         });
 
-        // Закрытие модалок по Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 if (!this.elements.editorModal.hidden) this.closeEditor();
@@ -371,6 +382,18 @@ class UIController {
         if (name in this.callbacks) {
             this.callbacks[name] = callback;
         }
+    }
+
+    // ========================================
+    // Modal Helpers
+    // ========================================
+
+    _showModal(modal) {
+        modal.hidden = false;
+    }
+
+    _hideModal(modal) {
+        modal.hidden = true;
     }
 
     // ========================================
@@ -687,7 +710,7 @@ class UIController {
         this.elements.editorTemplate.hidden = !isNew;
         this.elements.editorPaste.hidden = !isNew && !source;
         this.elements.editorLoadFile.hidden = !isNew && !source;
-        this.elements.editorModal.hidden = false;
+        this._showModal(this.elements.editorModal);
 
         // Фокус на textarea
         setTimeout(() => {
@@ -699,7 +722,7 @@ class UIController {
      * Закрывает редактор
      */
     closeEditor() {
-        this.elements.editorModal.hidden = true;
+        this._hideModal(this.elements.editorModal);
     }
 
     /**
@@ -719,7 +742,7 @@ class UIController {
      * Открывает настройки
      */
     openSettings() {
-        this.elements.settingsModal.hidden = false;
+        this._showModal(this.elements.settingsModal);
         this.closeSidebar();
     }
 
@@ -727,8 +750,8 @@ class UIController {
      * Закрывает настройки
      */
     closeSettings() {
-        this.elements.characterModal.hidden = true;
-        this.elements.settingsModal.hidden = true;
+        this._hideModal(this.elements.characterModal);
+        this._hideModal(this.elements.settingsModal);
     }
 
     /**
@@ -807,7 +830,6 @@ class UIController {
 
         let isDragging = false;
 
-        // Mouse/touch handlers for dragging
         const startDrag = (e) => {
             isDragging = true;
             track.style.cursor = 'grabbing';
@@ -826,7 +848,6 @@ class UIController {
             track.style.cursor = 'pointer';
         };
 
-        // Track interactions
         track.addEventListener('mousedown', startDrag);
         document.addEventListener('mousemove', drag);
         document.addEventListener('mouseup', endDrag);
@@ -835,13 +856,11 @@ class UIController {
         document.addEventListener('touchmove', drag);
         document.addEventListener('touchend', endDrag);
 
-        // Input change handler (for accessibility - keyboard)
         input.addEventListener('input', () => {
             updateVisual();
             onChange(parseInt(input.value));
         });
 
-        // Initial update
         updateVisual();
     }
 
@@ -862,22 +881,31 @@ class UIController {
     }
 
     // ========================================
-    // Editor Tabs
+    // Tab Switching
     // ========================================
+
+    /**
+     * Переключает вкладку по CSS-селекторам
+     * @param {string} btnSelector - селектор кнопок вкладок
+     * @param {string} contentPrefix - префикс id контента (e.g. 'editor-tab')
+     * @param {string} tabName - имя вкладки
+     */
+    _switchTab(btnSelector, contentPrefix, tabName) {
+        document.querySelectorAll(btnSelector).forEach(btn => {
+            btn.classList.toggle('is-active', btn.dataset.tab === tabName);
+        });
+        document.querySelectorAll(`.${contentPrefix}-content`).forEach(content => {
+            content.classList.toggle('is-active', content.id === `${contentPrefix}-${tabName}`);
+        });
+    }
 
     /**
      * Переключает вкладку редактора
      * @param {string} tabName - 'scenario' или 'ai-chat'
      */
     _switchEditorTab(tabName) {
-        document.querySelectorAll('.editor-tabs__btn').forEach(btn => {
-            btn.classList.toggle('is-active', btn.dataset.tab === tabName);
-        });
-        document.querySelectorAll('.editor-tab-content').forEach(content => {
-            content.classList.toggle('is-active', content.id === `editor-tab-${tabName}`);
-        });
+        this._switchTab('.editor-tabs__btn', 'editor-tab', tabName);
 
-        // Show/hide editor utility buttons based on tab
         const isScenario = tabName === 'scenario';
         this.elements.editorTemplate.hidden = !isScenario;
         this.elements.editorPaste.hidden = !isScenario;
@@ -905,7 +933,6 @@ class UIController {
         const hasKeys = !!(apiKeys.openai || apiKeys.grok);
         const hasChars = characters.length > 0;
 
-        // Show/hide states
         this.elements.aiChatNoKeys.hidden = hasKeys;
         this.elements.aiChatNoChars.hidden = !hasKeys || hasChars;
         this.elements.aiChatSetup.hidden = !hasKeys || !hasChars;
@@ -913,7 +940,6 @@ class UIController {
 
         if (!hasKeys || !hasChars) return;
 
-        // Populate character select
         this.elements.aiChatCharacter.innerHTML = '';
         characters.forEach(c => {
             const opt = document.createElement('option');
@@ -922,8 +948,6 @@ class UIController {
             this.elements.aiChatCharacter.appendChild(opt);
         });
 
-        // Populate model select based on available keys
-        // Prices: input/output per 1M tokens (USD), sorted cheap → expensive
         const providerGroups = [];
         if (apiKeys.openai) {
             providerGroups.push({
@@ -967,7 +991,6 @@ class UIController {
 
     showInputBar() {
         this.elements.chatInput.hidden = false;
-        // Add padding to messages for input bar
         requestAnimationFrame(() => {
             const inputHeight = this.elements.chatInput.offsetHeight;
             this.elements.messages.style.paddingBottom = `${inputHeight + 16}px`;
@@ -1005,12 +1028,7 @@ class UIController {
      * @param {string} tabName
      */
     _switchSettingsTab(tabName) {
-        document.querySelectorAll('.settings-tabs__btn').forEach(btn => {
-            btn.classList.toggle('is-active', btn.dataset.tab === tabName);
-        });
-        document.querySelectorAll('.settings-tab-content').forEach(content => {
-            content.classList.toggle('is-active', content.id === `settings-tab-${tabName}`);
-        });
+        this._switchTab('.settings-tabs__btn', 'settings-tab', tabName);
     }
 
     // ========================================
@@ -1043,7 +1061,7 @@ class UIController {
         this.elements.characterName.value = char?.name || '';
         this.elements.characterPrompt.value = char?.prompt || '';
         this.elements.characterModalTitle.textContent = t(char ? 'editCharacter' : 'addCharacter');
-        this.elements.characterModal.hidden = false;
+        this._showModal(this.elements.characterModal);
         this.elements.characterName.focus();
     }
 
@@ -1113,7 +1131,7 @@ class UIController {
             this._confirmResolve = resolve;
             this.elements.confirmTitle.textContent = title;
             this.elements.confirmMessage.textContent = message;
-            this.elements.confirmModal.hidden = false;
+            this._showModal(this.elements.confirmModal);
         });
     }
 
@@ -1121,7 +1139,7 @@ class UIController {
      * Закрывает диалог подтверждения
      */
     closeConfirm() {
-        this.elements.confirmModal.hidden = true;
+        this._hideModal(this.elements.confirmModal);
         this._confirmResolve = null;
     }
 

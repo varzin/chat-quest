@@ -4,7 +4,7 @@
  * Модуль для работы с localStorage
  */
 
-const STORAGE_KEYS = {
+const KEYS = {
     SCENARIOS: 'chatquest_scenarios',
     PROGRESS: 'chatquest_progress',
     SETTINGS: 'chatquest_settings',
@@ -24,7 +24,7 @@ function safeGet(key) {
         const data = localStorage.getItem(key);
         return data ? JSON.parse(data) : null;
     } catch (e) {
-        console.error('Storage read error:', e);
+        console.error(`Storage read error for "${key}":`, e);
         return null;
     }
 }
@@ -42,6 +42,35 @@ function safeSet(key, value) {
     }
 }
 
+/**
+ * Обновляет или добавляет элемент в список в localStorage
+ * @param {string} storageKey - ключ списка в localStorage
+ * @param {Object} item - элемент для сохранения
+ * @param {string} idField - имя поля-идентификатора
+ */
+function _updateListItem(storageKey, item, idField = 'id') {
+    const list = safeGet(storageKey) || [];
+    const idx = list.findIndex(entry => entry[idField] === item[idField]);
+    if (idx >= 0) {
+        list[idx] = item;
+    } else {
+        list.push(item);
+    }
+    safeSet(storageKey, list);
+}
+
+/**
+ * Безопасное удаление из localStorage
+ * @param {string} key
+ */
+function safeRemove(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {
+        console.error(`Storage delete error for "${key}":`, e);
+    }
+}
+
 // ========================================
 // Сценарии
 // ========================================
@@ -51,7 +80,7 @@ function safeSet(key, value) {
  * @returns {Array<{id: string, title: string, isDemo: boolean}>}
  */
 export function getScenarioList() {
-    return safeGet(STORAGE_KEYS.SCENARIOS) || [];
+    return safeGet(KEYS.SCENARIOS) || [];
 }
 
 /**
@@ -71,22 +100,8 @@ export function getScenarioSource(id) {
  * @param {boolean} isDemo
  */
 export function saveScenario(id, title, source, isDemo = false) {
-    // Сохраняем исходный код
     safeSet(`scenario_${id}`, source);
-
-    // Обновляем список сценариев
-    const list = getScenarioList();
-    const existingIndex = list.findIndex(s => s.id === id);
-
-    const scenarioMeta = { id, title, isDemo };
-
-    if (existingIndex >= 0) {
-        list[existingIndex] = scenarioMeta;
-    } else {
-        list.push(scenarioMeta);
-    }
-
-    safeSet(STORAGE_KEYS.SCENARIOS, list);
+    _updateListItem(KEYS.SCENARIOS, { id, title, isDemo });
 }
 
 /**
@@ -94,19 +109,12 @@ export function saveScenario(id, title, source, isDemo = false) {
  * @param {string} id
  */
 export function deleteScenario(id) {
-    // Удаляем исходный код
-    try {
-        localStorage.removeItem(`scenario_${id}`);
-    } catch (e) {
-        console.error('Storage delete error:', e);
-    }
-
-    // Удаляем прогресс
+    safeRemove(`scenario_${id}`);
     deleteProgress(id);
 
     // Обновляем список
     const list = getScenarioList().filter(s => s.id !== id);
-    safeSet(STORAGE_KEYS.SCENARIOS, list);
+    safeSet(KEYS.SCENARIOS, list);
 
     // Если это был текущий сценарий, сбрасываем
     const current = getCurrentItem();
@@ -125,7 +133,7 @@ export function deleteScenario(id) {
  * @returns {Object|null} - { currentKnot, messages, variables }
  */
 export function getProgress(scenarioId) {
-    const allProgress = safeGet(STORAGE_KEYS.PROGRESS) || {};
+    const allProgress = safeGet(KEYS.PROGRESS) || {};
     return allProgress[scenarioId] || null;
 }
 
@@ -135,9 +143,9 @@ export function getProgress(scenarioId) {
  * @param {Object} progress - { currentKnot, messages, variables }
  */
 export function saveProgress(scenarioId, progress) {
-    const allProgress = safeGet(STORAGE_KEYS.PROGRESS) || {};
+    const allProgress = safeGet(KEYS.PROGRESS) || {};
     allProgress[scenarioId] = progress;
-    safeSet(STORAGE_KEYS.PROGRESS, allProgress);
+    safeSet(KEYS.PROGRESS, allProgress);
 }
 
 /**
@@ -145,9 +153,9 @@ export function saveProgress(scenarioId, progress) {
  * @param {string} scenarioId
  */
 export function deleteProgress(scenarioId) {
-    const allProgress = safeGet(STORAGE_KEYS.PROGRESS) || {};
+    const allProgress = safeGet(KEYS.PROGRESS) || {};
     delete allProgress[scenarioId];
-    safeSet(STORAGE_KEYS.PROGRESS, allProgress);
+    safeSet(KEYS.PROGRESS, allProgress);
 }
 
 // ========================================
@@ -163,7 +171,7 @@ export function deleteProgress(scenarioId) {
  * @returns {Object}
  */
 export function getSettings() {
-    return safeGet(STORAGE_KEYS.SETTINGS) || {
+    return safeGet(KEYS.SETTINGS) || {
         language: null,
         theme: 'default',
         typingMinDelay: 400,
@@ -177,7 +185,7 @@ export function getSettings() {
  */
 export function saveSettings(settings) {
     const current = getSettings();
-    safeSet(STORAGE_KEYS.SETTINGS, { ...current, ...settings });
+    safeSet(KEYS.SETTINGS, { ...current, ...settings });
 }
 
 // ========================================
@@ -189,7 +197,7 @@ export function saveSettings(settings) {
  * @returns {Object} - { openai: string|null, grok: string|null }
  */
 export function getApiKeys() {
-    return safeGet(STORAGE_KEYS.API_KEYS) || { openai: null, grok: null };
+    return safeGet(KEYS.API_KEYS) || { openai: null, grok: null };
 }
 
 /**
@@ -200,7 +208,7 @@ export function getApiKeys() {
 export function saveApiKey(provider, key) {
     const keys = getApiKeys();
     keys[provider] = key || null;
-    safeSet(STORAGE_KEYS.API_KEYS, keys);
+    safeSet(KEYS.API_KEYS, keys);
 }
 
 // ========================================
@@ -212,7 +220,7 @@ export function saveApiKey(provider, key) {
  * @returns {Array<{id: string, name: string, prompt: string}>}
  */
 export function getCharacters() {
-    return safeGet(STORAGE_KEYS.CHARACTERS) || [];
+    return safeGet(KEYS.CHARACTERS) || [];
 }
 
 /**
@@ -220,14 +228,7 @@ export function getCharacters() {
  * @param {Object} character - { id, name, prompt }
  */
 export function saveCharacter(character) {
-    const list = getCharacters();
-    const idx = list.findIndex(c => c.id === character.id);
-    if (idx >= 0) {
-        list[idx] = character;
-    } else {
-        list.push(character);
-    }
-    safeSet(STORAGE_KEYS.CHARACTERS, list);
+    _updateListItem(KEYS.CHARACTERS, character);
 }
 
 /**
@@ -236,7 +237,7 @@ export function saveCharacter(character) {
  */
 export function deleteCharacter(id) {
     const list = getCharacters().filter(c => c.id !== id);
-    safeSet(STORAGE_KEYS.CHARACTERS, list);
+    safeSet(KEYS.CHARACTERS, list);
 }
 
 // ========================================
@@ -248,7 +249,7 @@ export function deleteCharacter(id) {
  * @returns {Array}
  */
 export function getAiChatList() {
-    return safeGet(STORAGE_KEYS.AI_CHATS) || [];
+    return safeGet(KEYS.AI_CHATS) || [];
 }
 
 /**
@@ -267,23 +268,13 @@ export function getAiChat(id) {
  */
 export function saveAiChat(id, data) {
     safeSet(`aichat_${id}`, data);
-
-    // Обновляем список
-    const list = getAiChatList();
-    const idx = list.findIndex(c => c.id === id);
-    const meta = {
+    _updateListItem(KEYS.AI_CHATS, {
         id,
         characterName: data.characterName,
         characterId: data.characterId,
         provider: data.provider,
         model: data.model
-    };
-    if (idx >= 0) {
-        list[idx] = meta;
-    } else {
-        list.push(meta);
-    }
-    safeSet(STORAGE_KEYS.AI_CHATS, list);
+    });
 }
 
 /**
@@ -291,14 +282,10 @@ export function saveAiChat(id, data) {
  * @param {string} id
  */
 export function deleteAiChat(id) {
-    try {
-        localStorage.removeItem(`aichat_${id}`);
-    } catch (e) {
-        console.error('Storage delete error:', e);
-    }
+    safeRemove(`aichat_${id}`);
 
     const list = getAiChatList().filter(c => c.id !== id);
-    safeSet(STORAGE_KEYS.AI_CHATS, list);
+    safeSet(KEYS.AI_CHATS, list);
 
     const current = getCurrentItem();
     if (current?.type === 'ai-chat' && current?.id === id) {
@@ -315,7 +302,7 @@ export function deleteAiChat(id) {
  * @returns {{type: string, id: string}|null}
  */
 export function getCurrentItem() {
-    const val = safeGet(STORAGE_KEYS.CURRENT);
+    const val = safeGet(KEYS.CURRENT);
     if (!val) return null;
     // Обратная совместимость: старый формат - просто строка ID
     if (typeof val === 'string') return { type: 'scenario', id: val };
@@ -327,7 +314,7 @@ export function getCurrentItem() {
  * @param {{type: string, id: string}|null} item
  */
 export function setCurrentItem(item) {
-    safeSet(STORAGE_KEYS.CURRENT, item);
+    safeSet(KEYS.CURRENT, item);
 }
 
 // ========================================
@@ -338,26 +325,13 @@ export function setCurrentItem(item) {
  * Полностью очищает все данные приложения
  */
 export function clearAllData() {
-    try {
-        // Удаляем все сценарии
-        const scenarios = getScenarioList();
-        scenarios.forEach(s => {
-            localStorage.removeItem(`scenario_${s.id}`);
-        });
+    const scenarios = getScenarioList();
+    scenarios.forEach(s => safeRemove(`scenario_${s.id}`));
 
-        // Удаляем все AI чаты
-        const aiChats = getAiChatList();
-        aiChats.forEach(c => {
-            localStorage.removeItem(`aichat_${c.id}`);
-        });
+    const aiChats = getAiChatList();
+    aiChats.forEach(c => safeRemove(`aichat_${c.id}`));
 
-        // Удаляем основные ключи
-        Object.values(STORAGE_KEYS).forEach(key => {
-            localStorage.removeItem(key);
-        });
-    } catch (e) {
-        console.error('Storage clear error:', e);
-    }
+    Object.values(KEYS).forEach(key => safeRemove(key));
 }
 
 export default {

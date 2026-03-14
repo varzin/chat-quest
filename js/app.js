@@ -11,13 +11,15 @@ import { InkEngine } from './engine.js';
 import { AiEngine } from './ai-engine.js';
 import UIController from './ui.js';
 
+const MODE = { SCENARIO: 'scenario', AI_CHAT: 'ai-chat' };
+
 
 class ChatQuestApp {
     constructor() {
         this.ui = new UIController();
         this.engine = null;
         this.aiEngine = null;
-        this.currentMode = null; // 'scenario' | 'ai-chat'
+        this.currentMode = null;
         this.currentScenarioId = null;
         this.currentAiChatId = null;
         this.isPlaying = false;
@@ -47,9 +49,9 @@ class ChatQuestApp {
 
         // Загружаем последний элемент
         const currentItem = storage.getCurrentItem();
-        if (currentItem?.type === 'ai-chat') {
+        if (currentItem?.type === MODE.AI_CHAT) {
             this._loadAiChat(currentItem.id);
-        } else if (currentItem?.type === 'scenario' || currentItem?.id) {
+        } else if (currentItem?.type === MODE.SCENARIO || currentItem?.id) {
             this._loadScenario(currentItem.id || currentItem);
         } else {
             const scenarios = storage.getScenarioList();
@@ -71,10 +73,14 @@ class ChatQuestApp {
         this.ui.populateAiChatSetup(storage.getApiKeys(), storage.getCharacters());
     }
 
-    /**
-     * Настраивает callbacks для UI
-     */
     _setupCallbacks() {
+        this._setupScenarioCallbacks();
+        this._setupEditorCallbacks();
+        this._setupSettingsCallbacks();
+        this._setupAiChatCallbacks();
+    }
+
+    _setupScenarioCallbacks() {
         this.ui.on('onScenarioSelect', (id) => this._loadScenario(id));
 
         this.ui.on('onScenarioEdit', (id) => {
@@ -94,7 +100,7 @@ class ChatQuestApp {
                 storage.deleteScenario(id);
                 this._refreshSidebarList();
 
-                if (this.currentMode === 'scenario' && this.currentScenarioId === id) {
+                if (this.currentMode === MODE.SCENARIO && this.currentScenarioId === id) {
                     this._loadFirstAvailable();
                 }
             }
@@ -102,7 +108,6 @@ class ChatQuestApp {
 
         this.ui.on('onAddScenario', () => {
             this._editingScenarioId = null;
-            // Refresh AI chat setup data before opening
             this.ui.populateAiChatSetup(storage.getApiKeys(), storage.getCharacters());
             this.ui.openEditor('', true);
             this.ui.closeSidebar();
@@ -111,7 +116,7 @@ class ChatQuestApp {
         this.ui.on('onLoadFile', (file) => this._loadFile(file));
 
         this.ui.on('onRestart', async () => {
-            if (this.currentMode === 'ai-chat' && this.aiEngine) {
+            if (this.currentMode === MODE.AI_CHAT && this.aiEngine) {
                 const confirmed = await this.ui.confirm(
                     t('confirm'),
                     t('confirmRestartChat')
@@ -134,9 +139,13 @@ class ChatQuestApp {
         });
 
         this.ui.on('onChoice', (index) => this._handleChoice(index));
+    }
 
+    _setupEditorCallbacks() {
         this.ui.on('onEditorSave', (source) => this._saveScenario(source));
+    }
 
+    _setupSettingsCallbacks() {
         this.ui.on('onThemeChange', (theme) => {
             this.ui.setTheme(theme);
             storage.saveSettings({ theme });
@@ -147,13 +156,7 @@ class ChatQuestApp {
                 typingMinDelay: minDelay,
                 typingMaxDelay: maxDelay
             });
-
-            if (this.engine) {
-                this.engine.globalSettings = storage.getSettings();
-            }
-            if (this.aiEngine) {
-                this.aiEngine.globalSettings = storage.getSettings();
-            }
+            this._updateEngineSettings();
         });
 
         this.ui.on('onLanguageChange', (lang) => {
@@ -174,12 +177,10 @@ class ChatQuestApp {
             }
         });
 
-        // API Keys
         this.ui.on('onApiKeySave', (provider, key) => {
             storage.saveApiKey(provider, key);
         });
 
-        // Characters
         this.ui.on('onCharacterSave', (character) => {
             storage.saveCharacter(character);
             this.ui.renderCharacters(storage.getCharacters());
@@ -195,8 +196,9 @@ class ChatQuestApp {
                 this.ui.renderCharacters(storage.getCharacters());
             }
         });
+    }
 
-        // AI Chat
+    _setupAiChatCallbacks() {
         this.ui.on('onStartAiChat', (characterId, provider, model, title) => {
             this._startNewAiChat(characterId, provider, model, title);
         });
@@ -212,7 +214,7 @@ class ChatQuestApp {
                 storage.deleteAiChat(id);
                 this._refreshSidebarList();
 
-                if (this.currentMode === 'ai-chat' && this.currentAiChatId === id) {
+                if (this.currentMode === MODE.AI_CHAT && this.currentAiChatId === id) {
                     this._loadFirstAvailable();
                 }
             }
@@ -234,11 +236,7 @@ class ChatQuestApp {
         } else if (aiChats.length > 0) {
             this._loadAiChat(aiChats[0].id);
         } else {
-            this.currentMode = null;
-            this.currentScenarioId = null;
-            this.currentAiChatId = null;
-            this.engine = null;
-            this.aiEngine = null;
+            this._resetCurrentMode();
             this.ui.hideInputBar();
             this.ui.hideChoices();
             this.ui.showEmptyState();
@@ -253,12 +251,42 @@ class ChatQuestApp {
     _refreshSidebarList() {
         const scenarios = storage.getScenarioList();
         const aiChats = storage.getAiChatList();
-        const currentItem = this.currentMode === 'ai-chat'
-            ? { type: 'ai-chat', id: this.currentAiChatId }
-            : this.currentMode === 'scenario'
-                ? { type: 'scenario', id: this.currentScenarioId }
+        const currentItem = this.currentMode === MODE.AI_CHAT
+            ? { type: MODE.AI_CHAT, id: this.currentAiChatId }
+            : this.currentMode === MODE.SCENARIO
+                ? { type: MODE.SCENARIO, id: this.currentScenarioId }
                 : null;
         this.ui.renderSidebarList(scenarios, aiChats, currentItem);
+    }
+
+    // ========================================
+    // Shared helpers
+    // ========================================
+
+    _resetCurrentMode() {
+        this.currentMode = null;
+        this.currentScenarioId = null;
+        this.currentAiChatId = null;
+        this.engine = null;
+        this.aiEngine = null;
+    }
+
+    _updateEngineSettings() {
+        const settings = storage.getSettings();
+        if (this.engine) {
+            this.engine.globalSettings = settings;
+        }
+        if (this.aiEngine) {
+            this.aiEngine.globalSettings = settings;
+        }
+    }
+
+    _restoreDisplayedMessages(messages, engine) {
+        this.ui.clearMessages();
+        messages.forEach(msg => {
+            const character = engine.getCharacter(msg.speaker);
+            this.ui.addMessage(msg, character);
+        });
     }
 
     // ========================================
@@ -309,11 +337,11 @@ class ChatQuestApp {
             const settings = storage.getSettings();
             this.engine = new InkEngine(config, knots, variables, settings);
             this.aiEngine = null;
-            this.currentMode = 'scenario';
+            this.currentMode = MODE.SCENARIO;
             this.currentScenarioId = id;
             this.currentAiChatId = null;
 
-            storage.setCurrentItem({ type: 'scenario', id });
+            storage.setCurrentItem({ type: MODE.SCENARIO, id });
 
             // Проверяем сохранённый прогресс
             const progress = storage.getProgress(id);
@@ -352,14 +380,7 @@ class ChatQuestApp {
     }
 
     _restoreMessages() {
-        this.ui.clearMessages();
-
-        const messages = this.engine.getMessages();
-        messages.forEach(msg => {
-            const character = this.engine.getCharacter(msg.speaker);
-            this.ui.addMessage(msg, character);
-        });
-
+        this._restoreDisplayedMessages(this.engine.getMessages(), this.engine);
         this.isPlaying = true;
         this._processContent();
     }
@@ -488,13 +509,12 @@ class ChatQuestApp {
         });
 
         this.engine = null;
-        this.currentMode = 'ai-chat';
+        this.currentMode = MODE.AI_CHAT;
         this.currentAiChatId = id;
         this.currentScenarioId = null;
 
         const chatTitle = title || character.name;
 
-        // Сохраняем в storage
         storage.saveAiChat(id, {
             title: chatTitle,
             characterId,
@@ -503,7 +523,7 @@ class ChatQuestApp {
             model,
             messages: []
         });
-        storage.setCurrentItem({ type: 'ai-chat', id });
+        storage.setCurrentItem({ type: MODE.AI_CHAT, id });
 
         // Обновляем UI
         this.ui.clearMessages();
@@ -549,20 +569,16 @@ class ChatQuestApp {
         });
 
         this.engine = null;
-        this.currentMode = 'ai-chat';
+        this.currentMode = MODE.AI_CHAT;
         this.currentAiChatId = id;
         this.currentScenarioId = null;
 
-        storage.setCurrentItem({ type: 'ai-chat', id });
+        storage.setCurrentItem({ type: MODE.AI_CHAT, id });
 
         // Restore messages
         if (chatData.messages?.length > 0) {
             this.aiEngine.restore({ displayedMessages: chatData.messages });
-            this.ui.clearMessages();
-            chatData.messages.forEach(msg => {
-                const char = this.aiEngine.getCharacter(msg.speaker);
-                this.ui.addMessage(msg, char);
-            });
+            this._restoreDisplayedMessages(chatData.messages, this.aiEngine);
         } else {
             this.ui.clearMessages();
         }
@@ -609,7 +625,6 @@ class ChatQuestApp {
         } catch (error) {
             this.ui.hideTyping();
 
-            // Показываем ошибку как системное сообщение
             const errorMsg = {
                 speaker: 'system',
                 text: `Error: ${error.message}`,
@@ -667,7 +682,7 @@ class ChatQuestApp {
             storage.saveScenario(id, config.dialog.title || t('untitled'), source, isDemo);
 
             const isNew = !this._editingScenarioId;
-            if (isNew || (this.currentMode === 'scenario' && id === this.currentScenarioId)) {
+            if (isNew || (this.currentMode === MODE.SCENARIO && id === this.currentScenarioId)) {
                 storage.deleteProgress(id);
                 this._loadScenario(id);
             }

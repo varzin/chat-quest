@@ -5,6 +5,16 @@
  * Без внешних библиотек
  */
 
+/** Regex constants for Ink parsing */
+const RE = {
+    VAR_DECLARATION: /^VAR\s+(\w+)\s*=\s*(.*)$/,
+    KNOT_DEFINITION: /^===\s*(\w+)\s*===?$/,
+    SPEAKER_ASSIGNMENT: /^~\s*speaker\s*=\s*["']?(\w+)["']?$/,
+    DIVERT: /^->\s*(\w+|END)\s*$/,
+    CHOICE_BRACKET: /^\+\s*\[(.*?)\]\s*(?:->\s*(\w+))?$/,
+    CHOICE_SIMPLE: /^\+\s*(.*?)\s*(?:->\s*(\w+))?$/,
+};
+
 /**
  * Разделяет файл на YAML и Ink части
  * @param {string} source
@@ -147,9 +157,22 @@ function parseInlineArray(str) {
     let current = '';
     let inQuotes = false;
     let quoteChar = '';
+    let escaped = false;
 
     for (let i = 0; i < str.length; i++) {
         const char = str[i];
+
+        if (escaped) {
+            current += char;
+            escaped = false;
+            continue;
+        }
+
+        if (char === '\\' && inQuotes) {
+            escaped = true;
+            current += char;
+            continue;
+        }
 
         if (!inQuotes && (char === '"' || char === "'")) {
             inQuotes = true;
@@ -186,10 +209,10 @@ function validateConfig(config) {
         return { valid: false, error: 'Missing required field: dialog.id' };
     }
     if (!config.dialog.participants || !Array.isArray(config.dialog.participants)) {
-        return { valid: false, error: 'Missing required field: dialog.participants' };
+        return { valid: false, error: 'dialog.participants must be an array of exactly 2 elements' };
     }
     if (config.dialog.participants.length !== 2) {
-        return { valid: false, error: 'dialog.participants must have exactly 2 elements' };
+        return { valid: false, error: 'dialog.participants must be an array of exactly 2 elements' };
     }
 
     // Проверяем characters
@@ -199,11 +222,11 @@ function validateConfig(config) {
 
     for (const participantId of config.dialog.participants) {
         if (!config.characters[participantId]) {
-            return { valid: false, error: `Missing character definition: ${participantId}` };
+            return { valid: false, error: `Missing character definition for participant "${participantId}" listed in dialog.participants` };
         }
         const char = config.characters[participantId];
         if (!char.name) {
-            return { valid: false, error: `Missing name for character: ${participantId}` };
+            return { valid: false, error: `Character "${participantId}" is missing required field: name` };
         }
     }
 
@@ -233,7 +256,7 @@ function parseInk(inkStr, participants) {
 
         // VAR объявление
         if (trimmed.startsWith('VAR ')) {
-            const match = trimmed.match(/^VAR\s+(\w+)\s*=\s*(.*)$/);
+            const match = trimmed.match(RE.VAR_DECLARATION);
             if (match) {
                 variables[match[1]] = parseYamlValue(match[2]);
             }
@@ -248,7 +271,7 @@ function parseInk(inkStr, participants) {
             }
 
             // Начинаем новый knot
-            const match = trimmed.match(/^===\s*(\w+)\s*===?$/);
+            const match = trimmed.match(RE.KNOT_DEFINITION);
             if (match) {
                 currentKnot = match[1];
                 currentContent = [];
@@ -289,7 +312,7 @@ function parseKnotContent(lines, participants) {
 
         // Speaker assignment: ~ speaker = "npc"
         if (trimmed.startsWith('~')) {
-            const match = trimmed.match(/^~\s*speaker\s*=\s*["']?(\w+)["']?$/);
+            const match = trimmed.match(RE.SPEAKER_ASSIGNMENT);
             if (match) {
                 currentSpeaker = match[1];
             }
@@ -352,7 +375,7 @@ function parseChoice(line) {
     let target = null;
 
     // Формат: + [Text] -> target (в скобках = показывать как сообщение игрока)
-    const bracketMatch = trimmed.match(/^\+\s*\[(.*?)\]\s*(?:->\s*(\w+))?$/);
+    const bracketMatch = trimmed.match(RE.CHOICE_BRACKET);
     if (bracketMatch) {
         text = bracketMatch[1].trim();
         target = bracketMatch[2] || null;
@@ -360,7 +383,7 @@ function parseChoice(line) {
     }
 
     // Формат: + Text -> target (без скобок = не показывать, скрытый переход)
-    const simpleMatch = trimmed.match(/^\+\s*(.*?)\s*(?:->\s*(\w+))?$/);
+    const simpleMatch = trimmed.match(RE.CHOICE_SIMPLE);
     if (simpleMatch) {
         text = simpleMatch[1].trim();
         target = simpleMatch[2] || null;

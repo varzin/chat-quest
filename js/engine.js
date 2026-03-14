@@ -4,6 +4,12 @@
  * Движок выполнения Ink-сценария
  */
 
+const TYPING_DEFAULTS = {
+    MIN_DELAY: 400,
+    MAX_DELAY: 1600,
+    CHAR_DELAY: 100,
+};
+
 export class InkEngine {
     /**
      * @param {Object} config - Конфигурация из YAML
@@ -65,23 +71,24 @@ export class InkEngine {
     }
 
     /**
-     * Получает текущий контент (текст или выборы)
-     * @returns {Object} - { type: 'text'|'choices'|'end', data: ... }
+     * Проверяет существование текущего knot, при отсутствии — завершает сценарий
+     * @returns {Object|null} knot или null если knot не найден
+     * @private
      */
-    getCurrentContent() {
-        if (this.isEnded) {
-            return { type: 'end' };
-        }
-
+    _ensureValidKnot() {
         const knot = this.knots[this.currentKnot];
         if (!knot) {
             this.isEnded = true;
-            return { type: 'end' };
         }
+        return knot || null;
+    }
 
-        const content = knot.content;
-
-        // Собираем текст до первого выбора или divert
+    /**
+     * Собирает контент из массива content начиная с указанного индекса
+     * @returns {{ textItems: Array, choices: Array, divert: Object|null, divertIndex: number }}
+     * @private
+     */
+    _collectContentFromIndex(content) {
         const textItems = [];
         const choices = [];
 
@@ -93,26 +100,50 @@ export class InkEngine {
             } else if (item.type === 'choice') {
                 choices.push({ ...item, index: i });
             } else if (item.type === 'divert') {
-                // Обрабатываем переход
-                if (item.target === 'END') {
-                    this.isEnded = true;
-                    // Сначала возвращаем оставшийся текст
-                    if (textItems.length > 0) {
-                        this.currentIndex = i;
-                        return { type: 'text', data: textItems };
-                    }
-                    return { type: 'end' };
-                } else {
-                    // Переходим к другому knot
-                    this.currentKnot = item.target;
-                    this.currentIndex = 0;
-                    // Сначала возвращаем оставшийся текст
-                    if (textItems.length > 0) {
-                        return { type: 'text', data: textItems };
-                    }
-                    // Рекурсивно получаем контент нового knot
-                    return this.getCurrentContent();
+                return { textItems, choices, divert: item, divertIndex: i };
+            }
+        }
+
+        return { textItems, choices, divert: null, divertIndex: -1 };
+    }
+
+    /**
+     * Получает текущий контент (текст или выборы)
+     * @returns {Object} - { type: 'text'|'choices'|'end', data: ... }
+     */
+    getCurrentContent() {
+        if (this.isEnded) {
+            return { type: 'end' };
+        }
+
+        const knot = this._ensureValidKnot();
+        if (!knot) {
+            return { type: 'end' };
+        }
+
+        const content = knot.content;
+        const { textItems, choices, divert, divertIndex } = this._collectContentFromIndex(content);
+
+        // Обрабатываем divert
+        if (divert) {
+            if (divert.target === 'END') {
+                this.isEnded = true;
+                // Сначала возвращаем оставшийся текст
+                if (textItems.length > 0) {
+                    this.currentIndex = divertIndex;
+                    return { type: 'text', data: textItems };
                 }
+                return { type: 'end' };
+            } else {
+                // Переходим к другому knot
+                this.currentKnot = divert.target;
+                this.currentIndex = 0;
+                // Сначала возвращаем оставшийся текст
+                if (textItems.length > 0) {
+                    return { type: 'text', data: textItems };
+                }
+                // Рекурсивно получаем контент нового knot
+                return this.getCurrentContent();
             }
         }
 
@@ -143,9 +174,8 @@ export class InkEngine {
      * @returns {Object} - Следующий контент
      */
     advance() {
-        const knot = this.knots[this.currentKnot];
+        const knot = this._ensureValidKnot();
         if (!knot) {
-            this.isEnded = true;
             return { type: 'end' };
         }
 
@@ -178,9 +208,8 @@ export class InkEngine {
      * @param {number} choiceIndex - Индекс выбора
      */
     makeChoice(choiceIndex) {
-        const knot = this.knots[this.currentKnot];
+        const knot = this._ensureValidKnot();
         if (!knot) {
-            this.isEnded = true;
             return;
         }
 
@@ -258,12 +287,12 @@ export class InkEngine {
         // Приоритет: глобальные настройки > fallback
         if (this.globalSettings) {
             return {
-                minDelayMs: this.globalSettings.typingMinDelay || 400,
-                maxDelayMs: this.globalSettings.typingMaxDelay || 1600
+                minDelayMs: this.globalSettings.typingMinDelay || TYPING_DEFAULTS.MIN_DELAY,
+                maxDelayMs: this.globalSettings.typingMaxDelay || TYPING_DEFAULTS.MAX_DELAY
             };
         }
         // Fallback для обратной совместимости
-        return this.config.ui?.typing || { minDelayMs: 400, maxDelayMs: 1600 };
+        return this.config.ui?.typing || { minDelayMs: TYPING_DEFAULTS.MIN_DELAY, maxDelayMs: TYPING_DEFAULTS.MAX_DELAY };
     }
 
     /**
@@ -273,12 +302,11 @@ export class InkEngine {
      */
     calculateTypingDelay(text) {
         const settings = this.getTypingSettings();
-        const minDelay = settings.minDelayMs || 600;
-        const maxDelay = settings.maxDelayMs || 4000;
+        const minDelay = settings.minDelayMs || TYPING_DEFAULTS.MIN_DELAY;
+        const maxDelay = settings.maxDelayMs || TYPING_DEFAULTS.MAX_DELAY;
 
         // Примерно 100мс на символ, но в пределах min/max
-        const charDelay = 100;
-        const calculatedDelay = text.length * charDelay;
+        const calculatedDelay = text.length * TYPING_DEFAULTS.CHAR_DELAY;
 
         return Math.min(Math.max(calculatedDelay, minDelay), maxDelay);
     }
