@@ -2,7 +2,13 @@
 
 /**
  * AI Chat Engine - отправка сообщений к OpenAI/Grok API
- * Поддерживает токен-бюджет и суммаризацию для оптимизации контекста
+ * Поддерживает токен-бюджет, суммаризацию и анти-репетиционную архитектуру
+ *
+ * Anti-repetition architecture:
+ * 1. API penalties (frequency_penalty, presence_penalty) — baseline token-level defense
+ * 2. Semantic deduplication — structurally similar AI messages removed from context
+ * 3. Variation state injection — explicit JSON block tracking patterns to avoid
+ * 4. Primacy bias — anti-repetition preamble at the top of system prompt
  */
 
 const ENDPOINTS = {
@@ -14,8 +20,10 @@ const DEFAULT_HISTORY_TOKEN_BUDGET = 4000;
 const SUMMARY_TRIGGER_MESSAGES = 30;
 const SUMMARY_INTERVAL_MESSAGES = 20;
 const RECENT_MESSAGES_KEEP = 4;
-const PATTERN_CHECK_COUNT = 5;
-const PATTERN_THRESHOLD = 3;
+const PATTERN_CHECK_COUNT = 6;
+const SIMILARITY_THRESHOLD = 0.4;
+const FREQUENCY_PENALTY = 0.45;
+const PRESENCE_PENALTY = 0.35;
 
 export class AiEngine {
     /**
@@ -40,8 +48,6 @@ export class AiEngine {
         this._summary = null;
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
-        /** @type {Map<number, string>} Shadow rephrased texts keyed by displayedMessages index */
-        this._rephrasedMap = new Map();
     }
 
     /**
@@ -79,193 +85,229 @@ export class AiEngine {
     }
 
     /**
-     * Эвристика: проверяет последние сообщения персонажа на структурное повторение
-     * @returns {{ detected: boolean, signals: string[] }}
+     * Извлекает структурные характеристики текста сообщения
+     * @param {string} text
+     * @returns {{ len: number, sentenceCount: number, endsWithAction: boolean, endsWithQuestion: boolean, firstWord: string, hasAction: boolean, ngrams: Set<string> }}
      */
-    _detectPattern() {
-        const texts = this._getRecentAiTexts(PATTERN_CHECK_COUNT);
-        if (texts.length < 3) return { detected: false, signals: [] };
-
-        const stats = texts.map(t => {
-            const sentences = t.split(/[.!?…]+/).filter(s => s.trim().length > 0);
-            const endsWithAction = /\*[^*]+\*\s*$/.test(t);
-            const endsWithQuestion = /\?\s*$/.test(t);
-            const firstWord = t.trim().split(/\s+/)[0]?.toLowerCase() || '';
-            return {
-                len: t.length,
-                sentenceCount: sentences.length,
-                endsWithAction,
-                endsWithQuestion,
-                firstWord
-            };
-        });
-
-        const signals = [];
-
-        // 1. Similar length (all within ±20% of median)
-        const lengths = stats.map(s => s.len).sort((a, b) => a - b);
-        const median = lengths[Math.floor(lengths.length / 2)];
-        if (median > 0 && stats.every(s => Math.abs(s.len - median) / median < 0.2)) {
-            signals.push('same_length');
+    _analyzeMessage(text) {
+        const sentences = text.split(/[.!?…]+/).filter(s => s.trim().length > 0);
+        const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+        // Bigrams for similarity comparison
+        const ngrams = new Set();
+        for (let i = 0; i < words.length - 1; i++) {
+            ngrams.add(words[i] + ' ' + words[i + 1]);
         }
-
-        // 2. Same sentence count
-        const counts = new Set(stats.map(s => s.sentenceCount));
-        if (counts.size === 1) {
-            signals.push('same_sentence_count');
-        }
-
-        // 3. All end with italicized action
-        if (stats.every(s => s.endsWithAction)) {
-            signals.push('all_end_with_action');
-        }
-
-        // 4. All end with question
-        if (stats.every(s => s.endsWithQuestion)) {
-            signals.push('all_end_with_question');
-        }
-
-        // 5. Repeated opening words
-        const firstWords = stats.map(s => s.firstWord);
-        const mostCommon = firstWords.sort((a, b) =>
-            firstWords.filter(w => w === b).length - firstWords.filter(w => w === a).length
-        )[0];
-        if (firstWords.filter(w => w === mostCommon).length >= Math.ceil(texts.length * 0.7)) {
-            signals.push('same_opening');
-        }
-
-        return { detected: signals.length >= PATTERN_THRESHOLD, signals };
+        return {
+            len: text.length,
+            sentenceCount: sentences.length,
+            endsWithAction: /\*[^*]+\*\s*$/.test(text),
+            endsWithQuestion: /\?\s*$/.test(text),
+            firstWord: text.trim().split(/\s+/)[0]?.toLowerCase() || '',
+            hasAction: /\*[^*]+\*/.test(text),
+            ngrams
+        };
     }
 
     /**
-     * Строит директиву для модели с описанием обнаруженных повторов
-     * @param {string[]} signals
-     * @returns {string}
+     * Вычисляет структурное сходство двух сообщений (0-1)
+     * Комбинирует n-gram overlap и структурные признаки
+     * @param {string} a
+     * @param {string} b
+     * @returns {number}
      */
-    _buildAntiRepetitionDirective(signals) {
-        const lang = this._detectLanguage(
-            this._getRecentAiTexts(3).join(' ')
-        );
+    _similarity(a, b) {
+        const sa = this._analyzeMessage(a);
+        const sb = this._analyzeMessage(b);
 
-        const descriptions = {
-            same_length: lang === 'ru'
-                ? 'все сообщения одинаковой длины'
-                : 'all messages are the same length',
-            same_sentence_count: lang === 'ru'
-                ? 'одинаковое количество предложений'
-                : 'same number of sentences',
-            all_end_with_action: lang === 'ru'
-                ? 'все заканчиваются действием в *звёздочках*'
-                : 'all end with an action in *asterisks*',
-            all_end_with_question: lang === 'ru'
-                ? 'все заканчиваются вопросом'
-                : 'all end with a question',
-            same_opening: lang === 'ru'
-                ? 'все начинаются с одного и того же слова'
-                : 'all start with the same word'
-        };
+        let score = 0;
+        let checks = 0;
 
-        const issues = signals.map(s => descriptions[s]).filter(Boolean).join('; ');
+        // 1. N-gram overlap (Jaccard)
+        if (sa.ngrams.size > 0 && sb.ngrams.size > 0) {
+            let intersection = 0;
+            for (const ng of sa.ngrams) {
+                if (sb.ngrams.has(ng)) intersection++;
+            }
+            const union = sa.ngrams.size + sb.ngrams.size - intersection;
+            score += (intersection / union) * 2; // Weight x2 — most important signal
+            checks += 2;
+        }
+
+        // 2. Similar length (±25%)
+        const maxLen = Math.max(sa.len, sb.len);
+        if (maxLen > 0 && Math.abs(sa.len - sb.len) / maxLen < 0.25) {
+            score += 1;
+        }
+        checks += 1;
+
+        // 3. Same sentence count
+        if (sa.sentenceCount === sb.sentenceCount) {
+            score += 1;
+        }
+        checks += 1;
+
+        // 4. Same ending pattern
+        if (sa.endsWithAction === sb.endsWithAction && sa.endsWithAction) {
+            score += 1;
+        }
+        if (sa.endsWithQuestion === sb.endsWithQuestion && sa.endsWithQuestion) {
+            score += 1;
+        }
+        checks += 2;
+
+        // 5. Same opening word
+        if (sa.firstWord === sb.firstWord && sa.firstWord.length > 0) {
+            score += 1;
+        }
+        checks += 1;
+
+        return checks > 0 ? score / checks : 0;
+    }
+
+    /**
+     * Удаляет структурно похожие AI-сообщения из контекста.
+     * Оставляет самое свежее, заменяет дубликаты однострочным summary.
+     * @param {Array<{role: string, content: string}>} messages
+     * @returns {Array<{role: string, content: string}>}
+     */
+    _deduplicateContext(messages) {
+        // Collect assistant message indices (skip system messages)
+        const assistantIndices = [];
+        for (let i = 0; i < messages.length; i++) {
+            if (messages[i].role === 'assistant') {
+                assistantIndices.push(i);
+            }
+        }
+        if (assistantIndices.length < 3) return messages;
+
+        // Compare each pair, mark earlier duplicates for removal
+        const toRemove = new Set();
+        for (let i = 0; i < assistantIndices.length; i++) {
+            if (toRemove.has(assistantIndices[i])) continue;
+            for (let j = i + 1; j < assistantIndices.length; j++) {
+                if (toRemove.has(assistantIndices[j])) continue;
+                const sim = this._similarity(
+                    messages[assistantIndices[i]].content,
+                    messages[assistantIndices[j]].content
+                );
+                if (sim >= SIMILARITY_THRESHOLD) {
+                    // Remove the earlier one, keep the later
+                    toRemove.add(assistantIndices[i]);
+                    break;
+                }
+            }
+        }
+
+        if (toRemove.size === 0) return messages;
+
+        // Build result: skip removed messages and their preceding user messages
+        // (to keep user-assistant pairing clean)
+        const result = [];
+        for (let i = 0; i < messages.length; i++) {
+            if (toRemove.has(i)) {
+                // Also remove the user message right before this assistant message
+                if (result.length > 0 && result[result.length - 1].role === 'user') {
+                    result.pop();
+                }
+                continue;
+            }
+            result.push(messages[i]);
+        }
+        return result;
+    }
+
+    /**
+     * Строит JSON-блок вариативного состояния для инжекции в контекст.
+     * Описывает структурные паттерны последних AI-ответов и явно указывает чего избегать.
+     * @returns {string|null} — state block or null if not enough data
+     */
+    _buildVariationState() {
+        const texts = this._getRecentAiTexts(PATTERN_CHECK_COUNT);
+        if (texts.length < 2) return null;
+
+        const analyses = texts.map(t => this._analyzeMessage(t));
+        const lang = this._detectLanguage(texts.join(' '));
+
+        // Gather pattern observations
+        const patterns = [];
+
+        // Opening words
+        const openers = analyses.map(a => a.firstWord);
+        const openerCounts = {};
+        openers.forEach(w => { openerCounts[w] = (openerCounts[w] || 0) + 1; });
+        const repeatedOpener = Object.entries(openerCounts).find(([, c]) => c >= 2);
+        if (repeatedOpener) {
+            patterns.push(lang === 'ru'
+                ? `начало с "${repeatedOpener[0]}" (${repeatedOpener[1]}/${texts.length})`
+                : `opening with "${repeatedOpener[0]}" (${repeatedOpener[1]}/${texts.length})`);
+        }
+
+        // Action endings
+        const actionEndings = analyses.filter(a => a.endsWithAction).length;
+        if (actionEndings >= 2) {
+            patterns.push(lang === 'ru'
+                ? `концовка *действием* (${actionEndings}/${texts.length})`
+                : `ending with *action* (${actionEndings}/${texts.length})`);
+        }
+
+        // Question endings
+        const questionEndings = analyses.filter(a => a.endsWithQuestion).length;
+        if (questionEndings >= 2) {
+            patterns.push(lang === 'ru'
+                ? `концовка вопросом (${questionEndings}/${texts.length})`
+                : `ending with question (${questionEndings}/${texts.length})`);
+        }
+
+        // Asterisk actions in general
+        const hasActions = analyses.filter(a => a.hasAction).length;
+        if (hasActions >= 3) {
+            patterns.push(lang === 'ru'
+                ? `*действия в звёздочках* (${hasActions}/${texts.length})`
+                : `*asterisk actions* (${hasActions}/${texts.length})`);
+        }
+
+        // Similar lengths
+        const lengths = analyses.map(a => a.len);
+        const avgLen = lengths.reduce((s, l) => s + l, 0) / lengths.length;
+        const allSimilarLen = lengths.every(l => Math.abs(l - avgLen) / avgLen < 0.2);
+        if (allSimilarLen && texts.length >= 3) {
+            patterns.push(lang === 'ru'
+                ? `одинаковая длина (~${Math.round(avgLen)} символов)`
+                : `same length (~${Math.round(avgLen)} chars)`);
+        }
+
+        // Same sentence count
+        const sentenceCounts = new Set(analyses.map(a => a.sentenceCount));
+        if (sentenceCounts.size === 1 && texts.length >= 3) {
+            const count = analyses[0].sentenceCount;
+            patterns.push(lang === 'ru'
+                ? `всегда ${count} предложений`
+                : `always ${count} sentences`);
+        }
+
+        if (patterns.length === 0) return null;
 
         if (lang === 'ru') {
-            return `[ВАЖНО] Твои последние ответы стали шаблонными (${issues}). В следующем ответе ОБЯЗАТЕЛЬНО измени структуру: используй другую длину, другое начало, другой порядок элементов. Не используй *действия в звёздочках* если раньше ты их использовал постоянно. Будь непредсказуемым.`;
+            return `[Анти-повторение] Обнаружены паттерны в твоих последних ответах: ${patterns.join('; ')}. В следующем ответе ИЗБЕГАЙ этих паттернов. Варьируй длину, структуру, начало и концовку.`;
         }
-        return `[IMPORTANT] Your recent replies have become formulaic (${issues}). In your next reply, you MUST change the structure: use a different length, different opening, different element order. Don't use *actions in asterisks* if you've been using them constantly. Be unpredictable.`;
+        return `[Anti-repetition] Patterns detected in your recent responses: ${patterns.join('; ')}. In your next response AVOID these patterns. Vary length, structure, opening and ending.`;
     }
 
     /**
-     * Перефразирует сообщения персонажа через API для разрушения паттерна
-     * @param {Array<{role: string, content: string}>} messages - контекст для API
-     * @returns {Promise<Array<{role: string, content: string}>>}
+     * Строит anti-repetition preamble для начала system prompt (primacy bias)
+     * @returns {string}
      */
-    async _rephrasePatternMessages(messages) {
-        const endpoint = ENDPOINTS[this.provider];
-        const aiMessages = messages.filter(m => m.role === 'assistant');
-        if (aiMessages.length < 2) return messages;
-
-        const textsToRephrase = aiMessages.map(m => m.content);
-        const lang = this._detectLanguage(textsToRephrase.join(' '));
-        const langInstruction = lang === 'ru'
-            ? 'Ответь на русском языке.'
-            : 'Respond in English.';
-
-        const numbered = textsToRephrase.map((t, i) => `${i + 1}. ${t}`).join('\n');
-
-        try {
-            const response = await fetch(endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify({
-                    model: this.model,
-                    messages: [
-                        {
-                            role: 'system',
-                            content: `Rephrase each message below. Keep the exact meaning and emotional tone, but vary the sentence structure, length, and phrasing so they don't look alike. Return only the rephrased messages, numbered the same way. ${langInstruction}`
-                        },
-                        { role: 'user', content: numbered }
-                    ]
-                })
-            });
-
-            if (!response.ok) return messages;
-
-            const data = await response.json();
-            const rephrased = data.choices?.[0]?.message?.content;
-            if (!rephrased) return messages;
-
-            // Parse numbered responses
-            const lines = rephrased.split(/\n/).filter(l => l.trim());
-            const parsed = [];
-            let current = '';
-            for (const line of lines) {
-                const match = line.match(/^\d+\.\s*(.*)/);
-                if (match) {
-                    if (current) parsed.push(current.trim());
-                    current = match[1];
-                } else {
-                    current += ' ' + line.trim();
-                }
-            }
-            if (current) parsed.push(current.trim());
-
-            if (parsed.length !== aiMessages.length) return messages;
-
-            // Swap rephrased content back into messages array + save shadow copies
-            const result = [...messages];
-            let aiIdx = 0;
-            // Map context assistant indices back to displayedMessages indices
-            const displayedAiIndices = [];
-            for (let i = 0; i < this.displayedMessages.length; i++) {
-                if (!this.displayedMessages[i].isPlayer) {
-                    displayedAiIndices.push(i);
-                }
-            }
-            // We only rephrased the assistant messages that were in the context
-            const contextAiCount = messages.filter(m => m.role === 'assistant').length;
-            const relevantDisplayedIndices = displayedAiIndices.slice(-contextAiCount);
-
-            for (let i = 0; i < result.length; i++) {
-                if (result[i].role === 'assistant') {
-                    result[i] = { ...result[i], content: parsed[aiIdx] };
-                    // Store as shadow copy
-                    if (aiIdx < relevantDisplayedIndices.length) {
-                        this._rephrasedMap.set(relevantDisplayedIndices[aiIdx], parsed[aiIdx]);
-                    }
-                    aiIdx++;
-                }
-            }
-            return result;
-        } catch (e) {
-            console.warn('Rephrase failed, using originals:', e.message);
-            return messages;
+    _buildPreamble() {
+        const lang = this._detectLanguage(this.systemPrompt);
+        if (lang === 'ru') {
+            return 'ВАЖНО: Каждый твой ответ должен отличаться по структуре от предыдущих. Варьируй длину, начало фразы, порядок элементов (действие/речь/мысль). Никогда не повторяй одну и ту же формулу ответа дважды подряд.\n\n';
         }
+        return 'IMPORTANT: Each response must differ structurally from your previous ones. Vary length, opening, element order (action/speech/thought). Never repeat the same response formula twice in a row.\n\n';
     }
 
     /**
      * Собирает историю сообщений в пределах токен-бюджета (с конца)
+     * Применяет дедупликацию и инжектирует variation state
      * @returns {Array<{role: string, content: string}>}
      */
     _buildContextMessages() {
@@ -277,23 +319,22 @@ export class AiEngine {
             remaining -= this._estimateTokens(this._summary);
         }
 
-        // Заполняем с конца, пока есть бюджет (используем shadow copies если есть)
+        // Заполняем с конца, пока есть бюджет
         const selected = [];
         for (let i = this.displayedMessages.length - 1; i >= 0 && remaining > 0; i--) {
             const msg = this.displayedMessages[i];
-            const text = this._rephrasedMap.get(i) || msg.text;
-            const tokens = this._estimateTokens(text);
+            const tokens = this._estimateTokens(msg.text);
             if (tokens > remaining && selected.length > 0) break;
             remaining -= tokens;
             selected.unshift({
                 role: msg.isPlayer ? 'user' : 'assistant',
-                content: text
+                content: msg.text
             });
         }
 
-        // Собираем итоговый массив
+        // System prompt with primacy bias preamble
         const result = [
-            { role: 'system', content: this.systemPrompt }
+            { role: 'system', content: this._buildPreamble() + this.systemPrompt }
         ];
 
         if (this._summary) {
@@ -301,7 +342,20 @@ export class AiEngine {
         }
 
         result.push(...selected);
-        return result;
+
+        // Semantic deduplication — remove structurally similar AI messages
+        const deduplicated = this._deduplicateContext(result);
+
+        // Variation state injection — right before the last user message
+        const variationState = this._buildVariationState();
+        if (variationState) {
+            const lastUserIdx = deduplicated.findLastIndex(m => m.role === 'user');
+            if (lastUserIdx > 0) {
+                deduplicated.splice(lastUserIdx, 0, { role: 'system', content: variationState });
+            }
+        }
+
+        return deduplicated;
     }
 
     /**
@@ -313,19 +367,7 @@ export class AiEngine {
         const endpoint = ENDPOINTS[this.provider];
         if (!endpoint) throw new Error(`Unknown provider: ${this.provider}`);
 
-        let apiMessages = this._buildContextMessages();
-
-        // Pattern detection + rephrasing + anti-repetition directive
-        const patternResult = this._detectPattern();
-        if (patternResult.detected) {
-            apiMessages = await this._rephrasePatternMessages(apiMessages);
-            // Inject anti-repetition directive right before the last user message
-            const directive = this._buildAntiRepetitionDirective(patternResult.signals);
-            const lastUserIdx = apiMessages.findLastIndex(m => m.role === 'user');
-            if (lastUserIdx > 0) {
-                apiMessages.splice(lastUserIdx, 0, { role: 'system', content: directive });
-            }
-        }
+        const apiMessages = this._buildContextMessages();
 
         const response = await fetch(endpoint, {
             method: 'POST',
@@ -335,7 +377,9 @@ export class AiEngine {
             },
             body: JSON.stringify({
                 model: this.model,
-                messages: apiMessages
+                messages: apiMessages,
+                frequency_penalty: FREQUENCY_PENALTY,
+                presence_penalty: PRESENCE_PENALTY
             })
         });
 
@@ -498,8 +542,7 @@ export class AiEngine {
             model: this.model,
             displayedMessages: [...this.displayedMessages],
             _summary: this._summary,
-            _summaryUpToIndex: this._summaryUpToIndex,
-            _rephrasedMap: Array.from(this._rephrasedMap.entries())
+            _summaryUpToIndex: this._summaryUpToIndex
         };
     }
 
@@ -509,7 +552,6 @@ export class AiEngine {
         }
         this._summary = state._summary || null;
         this._summaryUpToIndex = state._summaryUpToIndex || 0;
-        this._rephrasedMap = new Map(state._rephrasedMap || []);
     }
 
     reset() {
@@ -517,7 +559,6 @@ export class AiEngine {
         this._summary = null;
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
-        this._rephrasedMap = new Map();
     }
 }
 
