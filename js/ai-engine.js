@@ -2,13 +2,14 @@
 
 /**
  * AI Chat Engine - отправка сообщений к OpenAI/Grok API
- * Поддерживает токен-бюджет, суммаризацию и анти-репетиционную архитектуру
+ * Поддерживает токен-бюджет, per-message condensation и суммаризацию
  *
- * Anti-repetition architecture:
- * 1. API penalties (frequency_penalty, presence_penalty) — baseline token-level defense (OpenAI only; skipped for providers that don't support them)
- * 2. Semantic deduplication — structurally similar AI messages removed from context
- * 3. Variation state injection — explicit JSON block tracking patterns to avoid
- * 4. Primacy bias — anti-repetition preamble at the top of system prompt
+ * Context architecture:
+ * 1. Per-message condensation — AI responses condensed to essential content after generation
+ * 2. Condensed context — older messages sent as system-role summaries (no style contamination)
+ * 3. Original recent window — last N messages sent as-is for tone continuity
+ * 4. API penalties (frequency_penalty, presence_penalty) — complementary token-level defense
+ * 5. Rolling summary — fallback for very old messages beyond token budget
  */
 
 const ENDPOINTS = {
@@ -17,13 +18,24 @@ const ENDPOINTS = {
 };
 
 const DEFAULT_HISTORY_TOKEN_BUDGET = 4000;
-const SUMMARY_TRIGGER_MESSAGES = 30;
-const SUMMARY_INTERVAL_MESSAGES = 20;
+const SUMMARY_TRIGGER_MESSAGES = 50;
+const SUMMARY_INTERVAL_MESSAGES = 30;
 const RECENT_MESSAGES_KEEP = 4;
-const PATTERN_CHECK_COUNT = 6;
-const SIMILARITY_THRESHOLD = 0.4;
+const CONDENSE_MAX_TOKENS = 150;
 const FREQUENCY_PENALTY = 0.45;
 const PRESENCE_PENALTY = 0.35;
+const REMINDER_CHECK_COUNT = 3;
+
+const REMINDERS = {
+    NO_QUESTIONS: {
+        ru: 'Не заканчивай вопросом. Добавь от себя: факт, воспоминание, предложение или наблюдение.',
+        en: 'Do not end with a question. Add something of your own: a fact, memory, suggestion, or observation.'
+    },
+    VARY_LENGTH: {
+        ru: 'Измени длину — сделай заметно короче или длиннее предыдущих.',
+        en: 'Change length — make it noticeably shorter or longer than previous ones.'
+    }
+};
 
 export class AiEngine {
     /**
@@ -48,6 +60,7 @@ export class AiEngine {
         this._summary = null;
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
+        this._pendingCondensed = null;
     }
 
     /**
@@ -70,233 +83,61 @@ export class AiEngine {
     }
 
     /**
-     * Извлекает последние N сообщений персонажа (не игрока)
-     * @param {number} count
-     * @returns {string[]}
-     */
-    _getRecentAiTexts(count) {
-        const texts = [];
-        for (let i = this.displayedMessages.length - 1; i >= 0 && texts.length < count; i--) {
-            if (!this.displayedMessages[i].isPlayer) {
-                texts.unshift(this.displayedMessages[i].text);
-            }
-        }
-        return texts;
-    }
-
-    /**
-     * Извлекает структурные характеристики текста сообщения
+     * Определяет язык по наличию кириллицы
      * @param {string} text
-     * @returns {{ len: number, sentenceCount: number, endsWithAction: boolean, endsWithQuestion: boolean, firstWord: string, hasAction: boolean, ngrams: Set<string> }}
+     * @returns {'ru'|'en'}
      */
-    _analyzeMessage(text) {
-        const sentences = text.split(/[.!?…]+/).filter(s => s.trim().length > 0);
-        const words = text.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-        // Bigrams for similarity comparison
-        const ngrams = new Set();
-        for (let i = 0; i < words.length - 1; i++) {
-            ngrams.add(words[i] + ' ' + words[i + 1]);
+    _detectLanguage(text) {
+        let cyrillic = 0;
+        const sample = text.slice(0, 500);
+        for (let i = 0; i < sample.length; i++) {
+            const code = sample.charCodeAt(i);
+            if (code >= 0x0400 && code <= 0x04FF) cyrillic++;
         }
-        return {
-            len: text.length,
-            sentenceCount: sentences.length,
-            endsWithAction: /\*[^*]+\*\s*$/.test(text),
-            endsWithQuestion: /\?\s*$/.test(text),
-            firstWord: text.trim().split(/\s+/)[0]?.toLowerCase() || '',
-            hasAction: /\*[^*]+\*/.test(text),
-            ngrams
-        };
+        return cyrillic > sample.length * 0.15 ? 'ru' : 'en';
     }
 
     /**
-     * Вычисляет структурное сходство двух сообщений (0-1)
-     * Комбинирует n-gram overlap и структурные признаки
-     * @param {string} a
-     * @param {string} b
-     * @returns {number}
+     * Сжимает сообщение персонажа до сути (1-2 предложения, третье лицо)
+     * @param {string} messageText
+     * @returns {Promise<string>} — condensed text or original on failure
      */
-    _similarity(a, b) {
-        const sa = this._analyzeMessage(a);
-        const sb = this._analyzeMessage(b);
+    async _condenseMessage(messageText) {
+        const endpoint = ENDPOINTS[this.provider];
+        if (!endpoint) return messageText;
 
-        let score = 0;
-        let checks = 0;
+        const lang = this._detectLanguage(messageText);
+        const prompt = lang === 'ru'
+            ? 'Сократи это сообщение ролевой игры до сути в 1-2 предложениях, от третьего лица. Извлеки ТОЛЬКО: что произошло, что было сказано, какие решения/действия. Убери стиль, атмосферу, повторяющиеся описания. Сохрани имена и конкретные детали.'
+            : 'Condense this roleplay message to its essential content in 1-2 sentences, third person. Extract ONLY: what happened, what was communicated, any decisions or actions taken. Strip all style, atmosphere, repetitive descriptions. Keep character names and concrete details.';
 
-        // 1. N-gram overlap (Jaccard)
-        if (sa.ngrams.size > 0 && sb.ngrams.size > 0) {
-            let intersection = 0;
-            for (const ng of sa.ngrams) {
-                if (sb.ngrams.has(ng)) intersection++;
-            }
-            const union = sa.ngrams.size + sb.ngrams.size - intersection;
-            score += (intersection / union) * 2; // Weight x2 — most important signal
-            checks += 2;
+        try {
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`
+                },
+                body: JSON.stringify({
+                    model: this.model,
+                    messages: [
+                        { role: 'system', content: prompt },
+                        { role: 'user', content: messageText }
+                    ],
+                    max_tokens: CONDENSE_MAX_TOKENS
+                })
+            });
+
+            if (!response.ok) return messageText;
+
+            const data = await response.json();
+            return data.choices?.[0]?.message?.content || messageText;
+        } catch (e) {
+            console.warn('Condensation failed, using original:', e.message);
+            return messageText;
         }
-
-        // 2. Similar length (±25%)
-        const maxLen = Math.max(sa.len, sb.len);
-        if (maxLen > 0 && Math.abs(sa.len - sb.len) / maxLen < 0.25) {
-            score += 1;
-        }
-        checks += 1;
-
-        // 3. Same sentence count
-        if (sa.sentenceCount === sb.sentenceCount) {
-            score += 1;
-        }
-        checks += 1;
-
-        // 4. Same ending pattern
-        if (sa.endsWithAction === sb.endsWithAction && sa.endsWithAction) {
-            score += 1;
-        }
-        if (sa.endsWithQuestion === sb.endsWithQuestion && sa.endsWithQuestion) {
-            score += 1;
-        }
-        checks += 2;
-
-        // 5. Same opening word
-        if (sa.firstWord === sb.firstWord && sa.firstWord.length > 0) {
-            score += 1;
-        }
-        checks += 1;
-
-        return checks > 0 ? score / checks : 0;
     }
 
-    /**
-     * Удаляет структурно похожие AI-сообщения из контекста.
-     * Оставляет самое свежее, заменяет дубликаты однострочным summary.
-     * @param {Array<{role: string, content: string}>} messages
-     * @returns {Array<{role: string, content: string}>}
-     */
-    _deduplicateContext(messages) {
-        // Collect assistant message indices (skip system messages)
-        const assistantIndices = [];
-        for (let i = 0; i < messages.length; i++) {
-            if (messages[i].role === 'assistant') {
-                assistantIndices.push(i);
-            }
-        }
-        if (assistantIndices.length < 3) return messages;
-
-        // Compare each pair, mark earlier duplicates for removal
-        const toRemove = new Set();
-        for (let i = 0; i < assistantIndices.length; i++) {
-            if (toRemove.has(assistantIndices[i])) continue;
-            for (let j = i + 1; j < assistantIndices.length; j++) {
-                if (toRemove.has(assistantIndices[j])) continue;
-                const sim = this._similarity(
-                    messages[assistantIndices[i]].content,
-                    messages[assistantIndices[j]].content
-                );
-                if (sim >= SIMILARITY_THRESHOLD) {
-                    // Remove the earlier one, keep the later
-                    toRemove.add(assistantIndices[i]);
-                    break;
-                }
-            }
-        }
-
-        if (toRemove.size === 0) return messages;
-
-        // Build result: skip removed messages and their preceding user messages
-        // (to keep user-assistant pairing clean)
-        const result = [];
-        for (let i = 0; i < messages.length; i++) {
-            if (toRemove.has(i)) {
-                // Also remove the user message right before this assistant message
-                if (result.length > 0 && result[result.length - 1].role === 'user') {
-                    result.pop();
-                }
-                continue;
-            }
-            result.push(messages[i]);
-        }
-        return result;
-    }
-
-    /**
-     * Строит JSON-блок вариативного состояния для инжекции в контекст.
-     * Описывает структурные паттерны последних AI-ответов и явно указывает чего избегать.
-     * @returns {string|null} — state block or null if not enough data
-     */
-    _buildVariationState() {
-        const texts = this._getRecentAiTexts(PATTERN_CHECK_COUNT);
-        if (texts.length < 2) return null;
-
-        const analyses = texts.map(t => this._analyzeMessage(t));
-        const lang = this._detectLanguage(texts.join(' '));
-
-        // Gather pattern observations
-        const patterns = [];
-
-        // Opening words
-        const openers = analyses.map(a => a.firstWord);
-        const openerCounts = {};
-        openers.forEach(w => { openerCounts[w] = (openerCounts[w] || 0) + 1; });
-        const repeatedOpener = Object.entries(openerCounts).find(([, c]) => c >= 2);
-        if (repeatedOpener) {
-            patterns.push(lang === 'ru'
-                ? `начало с "${repeatedOpener[0]}" (${repeatedOpener[1]}/${texts.length})`
-                : `opening with "${repeatedOpener[0]}" (${repeatedOpener[1]}/${texts.length})`);
-        }
-
-        // Action endings
-        const actionEndings = analyses.filter(a => a.endsWithAction).length;
-        if (actionEndings >= 2) {
-            patterns.push(lang === 'ru'
-                ? `концовка *действием* (${actionEndings}/${texts.length})`
-                : `ending with *action* (${actionEndings}/${texts.length})`);
-        }
-
-        // Question endings
-        const questionEndings = analyses.filter(a => a.endsWithQuestion).length;
-        if (questionEndings >= 2) {
-            patterns.push(lang === 'ru'
-                ? `концовка вопросом (${questionEndings}/${texts.length})`
-                : `ending with question (${questionEndings}/${texts.length})`);
-        }
-
-        // Asterisk actions in general
-        const hasActions = analyses.filter(a => a.hasAction).length;
-        if (hasActions >= 3) {
-            patterns.push(lang === 'ru'
-                ? `*действия в звёздочках* (${hasActions}/${texts.length})`
-                : `*asterisk actions* (${hasActions}/${texts.length})`);
-        }
-
-        // Similar lengths
-        const lengths = analyses.map(a => a.len);
-        const avgLen = lengths.reduce((s, l) => s + l, 0) / lengths.length;
-        const allSimilarLen = lengths.every(l => Math.abs(l - avgLen) / avgLen < 0.2);
-        if (allSimilarLen && texts.length >= 3) {
-            patterns.push(lang === 'ru'
-                ? `одинаковая длина (~${Math.round(avgLen)} символов)`
-                : `same length (~${Math.round(avgLen)} chars)`);
-        }
-
-        // Same sentence count
-        const sentenceCounts = new Set(analyses.map(a => a.sentenceCount));
-        if (sentenceCounts.size === 1 && texts.length >= 3) {
-            const count = analyses[0].sentenceCount;
-            patterns.push(lang === 'ru'
-                ? `всегда ${count} предложений`
-                : `always ${count} sentences`);
-        }
-
-        if (patterns.length === 0) return null;
-
-        if (lang === 'ru') {
-            return `[Анти-повторение] Обнаружены паттерны в твоих последних ответах: ${patterns.join('; ')}. В следующем ответе ИЗБЕГАЙ этих паттернов. Варьируй длину, структуру, начало и концовку.`;
-        }
-        return `[Anti-repetition] Patterns detected in your recent responses: ${patterns.join('; ')}. In your next response AVOID these patterns. Vary length, structure, opening and ending.`;
-    }
-
-    /**
-     * Строит anti-repetition preamble для начала system prompt (primacy bias)
-     * @returns {string}
-     */
     /**
      * Возвращает объект с penalties для API-запроса.
      * Grok и некоторые другие провайдеры не поддерживают эти параметры.
@@ -310,65 +151,108 @@ export class AiEngine {
         };
     }
 
-    _buildPreamble() {
-        const lang = this._detectLanguage(this.systemPrompt);
-        if (lang === 'ru') {
-            return 'ВАЖНО: Каждый твой ответ должен отличаться по структуре от предыдущих. Варьируй длину, начало фразы, порядок элементов (действие/речь/мысль). Никогда не повторяй одну и ту же формулу ответа дважды подряд.\n\n';
-        }
-        return 'IMPORTANT: Each response must differ structurally from your previous ones. Vary length, opening, element order (action/speech/thought). Never repeat the same response formula twice in a row.\n\n';
-    }
-
     /**
-     * Собирает историю сообщений в пределах токен-бюджета (с конца)
-     * Применяет дедупликацию и инжектирует variation state
+     * Собирает историю сообщений для API.
+     * Последние RECENT_MESSAGES_KEEP — оригиналы (user/assistant).
+     * Более старые — сжатые версии в одном system-сообщении.
      * @returns {Array<{role: string, content: string}>}
      */
     _buildContextMessages() {
         const budget = this.globalSettings?.historyTokenBudget || DEFAULT_HISTORY_TOKEN_BUDGET;
         let remaining = budget;
 
-        // Если есть summary, вычтем его токены из бюджета
+        // 1. System prompt
+        const result = [
+            { role: 'system', content: this.systemPrompt }
+        ];
+
+        // 2. Summary для очень старых сообщений
         if (this._summary) {
             remaining -= this._estimateTokens(this._summary);
+            result.push({ role: 'system', content: `Previous conversation summary: ${this._summary}` });
         }
 
-        // Заполняем с конца, пока есть бюджет
-        const selected = [];
-        for (let i = this.displayedMessages.length - 1; i >= 0 && remaining > 0; i--) {
+        const total = this.displayedMessages.length;
+        const recentStart = Math.max(0, total - RECENT_MESSAGES_KEEP);
+
+        // 3. Сжатые сообщения (старше recent window) — одно system-сообщение
+        const condensedParts = [];
+        const condensedStart = this._summaryUpToIndex || 0;
+        for (let i = condensedStart; i < recentStart && remaining > 0; i++) {
+            const msg = this.displayedMessages[i];
+            const text = msg.condensed || msg.text;
+            const tokens = this._estimateTokens(text);
+            if (tokens > remaining && condensedParts.length > 0) break;
+            remaining -= tokens;
+
+            const speaker = msg.isPlayer ? 'Player' : this.characterName;
+            condensedParts.push(`${speaker}: ${text}`);
+        }
+
+        if (condensedParts.length > 0) {
+            result.push({
+                role: 'system',
+                content: `[Conversation context]\n${condensedParts.join('\n')}`
+            });
+        }
+
+        // 4. Последние сообщения — оригиналы как user/assistant
+        for (let i = recentStart; i < total; i++) {
             const msg = this.displayedMessages[i];
             const tokens = this._estimateTokens(msg.text);
-            if (tokens > remaining && selected.length > 0) break;
+            if (tokens > remaining && i > recentStart) break;
             remaining -= tokens;
-            selected.unshift({
+            result.push({
                 role: msg.isPlayer ? 'user' : 'assistant',
                 content: msg.text
             });
         }
 
-        // System prompt with primacy bias preamble
-        const result = [
-            { role: 'system', content: this._buildPreamble() + this.systemPrompt }
-        ];
-
-        if (this._summary) {
-            result.push({ role: 'system', content: `Previous conversation summary: ${this._summary}` });
+        // 5. Динамические напоминания — между предпоследним и последним сообщением
+        const reminderText = this._buildReminder(result);
+        if (reminderText) {
+            // Вставляем за 2 позиции до конца (между msg[-2] и msg[-1])
+            const insertIdx = Math.max(1, result.length - 2);
+            result.splice(insertIdx, 0, { role: 'system', content: reminderText });
         }
 
-        result.push(...selected);
+        return result;
+    }
 
-        // Semantic deduplication — remove structurally similar AI messages
-        const deduplicated = this._deduplicateContext(result);
-
-        // Variation state injection — right before the last user message
-        const variationState = this._buildVariationState();
-        if (variationState) {
-            const lastUserIdx = deduplicated.findLastIndex(m => m.role === 'user');
-            if (lastUserIdx > 0) {
-                deduplicated.splice(lastUserIdx, 0, { role: 'system', content: variationState });
+    /**
+     * Собирает динамические напоминания на основе паттернов в последних сообщениях.
+     * Инжектируется близко к концу контекста для максимального влияния (recency bias).
+     * @param {Array<{role: string, content: string}>} contextMessages
+     * @returns {string|null}
+     */
+    _buildReminder(contextMessages) {
+        const recentAi = [];
+        for (let i = contextMessages.length - 1; i >= 0 && recentAi.length < REMINDER_CHECK_COUNT; i--) {
+            if (contextMessages[i].role === 'assistant') {
+                recentAi.push(contextMessages[i].content);
             }
         }
 
-        return deduplicated;
+        const lang = this._detectLanguage(
+            recentAi.length > 0 ? recentAi.join(' ') : this.systemPrompt
+        );
+        const issues = [];
+
+        // 1. Вопросы + инициатива — статическое напоминание (всегда)
+        issues.push(REMINDERS.NO_QUESTIONS[lang]);
+
+        if (recentAi.length < 2) {
+            return issues.join(' ');
+        }
+
+        // 2. Одинаковая длина? (все ±20% от средней)
+        const lengths = recentAi.map(t => t.length);
+        const avg = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+        if (avg > 0 && lengths.every(l => Math.abs(l - avg) / avg < 0.2)) {
+            issues.push(REMINDERS.VARY_LENGTH[lang]);
+        }
+
+        return issues.join(' ');
     }
 
     /**
@@ -407,6 +291,9 @@ export class AiEngine {
         const data = await response.json();
         const reply = data.choices?.[0]?.message?.content || '';
 
+        // Сжимаем ответ для будущего контекста
+        this._pendingCondensed = await this._condenseMessage(reply);
+
         // Попытка суммаризации (не блокирует ответ при ошибке)
         await this._maybeSummarize();
 
@@ -429,21 +316,6 @@ export class AiEngine {
     }
 
     /**
-     * Определяет язык по наличию кириллицы
-     * @param {string} text
-     * @returns {'ru'|'en'}
-     */
-    _detectLanguage(text) {
-        let cyrillic = 0;
-        const sample = text.slice(0, 500);
-        for (let i = 0; i < sample.length; i++) {
-            const code = sample.charCodeAt(i);
-            if (code >= 0x0400 && code <= 0x04FF) cyrillic++;
-        }
-        return cyrillic > sample.length * 0.15 ? 'ru' : 'en';
-    }
-
-    /**
      * Генерирует summary старых сообщений через API
      */
     async _generateSummary() {
@@ -455,13 +327,13 @@ export class AiEngine {
 
             const messagesToSummarize = this.displayedMessages.slice(this._summaryUpToIndex, endIdx);
 
-            // Формируем текст диалога для суммаризации
+            // Используем condensed версии если доступны
             const dialogText = messagesToSummarize.map(msg => {
                 const speaker = msg.isPlayer ? 'Player' : (msg.speaker || 'NPC');
-                return `${speaker}: ${msg.text}`;
+                const text = msg.condensed || msg.text;
+                return `${speaker}: ${text}`;
             }).join('\n');
 
-            // Определяем язык
             const lang = this._detectLanguage(dialogText);
             const langInstruction = lang === 'ru'
                 ? 'Ответь на русском языке.'
@@ -522,6 +394,10 @@ export class AiEngine {
     }
 
     addMessage(message) {
+        if (!message.isPlayer && this._pendingCondensed) {
+            message.condensed = this._pendingCondensed;
+            this._pendingCondensed = null;
+        }
         this.displayedMessages.push(message);
     }
 
@@ -571,6 +447,7 @@ export class AiEngine {
         this._summary = null;
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
+        this._pendingCondensed = null;
     }
 }
 

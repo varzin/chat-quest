@@ -647,8 +647,6 @@ class ChatQuestApp {
 
             this.ui.addMessage(npcMessage, npcChar);
             this.aiEngine.addMessage(npcMessage);
-
-            this._saveAiChatProgress();
         } catch (error) {
             this.ui.hideTyping();
 
@@ -659,6 +657,9 @@ class ChatQuestApp {
             };
             this.ui.addMessage(errorMsg, { name: 'System', avatar: null });
         }
+
+        // Сохраняем в любом случае — чтобы сообщение игрока не пропало при ошибке
+        this._saveAiChatProgress();
 
         this.ui.setInputEnabled(true);
         this.ui.focusInput();

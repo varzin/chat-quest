@@ -32,10 +32,12 @@ Scenarios use YAML front matter + Ink syntax. See `docs/format-spec.md` for deta
 node --test tests/*.test.mjs
 ```
 
-## AI Anti-Repetition Architecture
+## AI Context Architecture
 
-The AI chat engine uses a 4-layer defense against formulaic responses.
-No extra API calls — all countermeasures work locally except the main request.
+The AI chat engine prevents style contamination through per-message
+condensation. Each AI response is condensed to its essential content
+after generation. The model sees clean factual context, not its own
+previous stylistic patterns.
 
 ### Message Flow
 
@@ -44,77 +46,59 @@ User sends message
         |
         v
 +------------------------+
-| Build Context Messages |  Token-budget window
-+------------------------+  from displayedMessages
+| Build Context Messages |
++------------------------+
         |
         |   +-------------------------------+
-        |   | 1. Preamble + System prompt   |  ← primacy bias
+        |   | 1. System prompt              |
         |   +-------------------------------+
-        |   | 2. Summary (if exists)        |
+        |   | 2. Summary (if exists)        |  ← very old messages
         |   +-------------------------------+
-        |   | 3. Recent messages            |
+        |   | 3. Condensed context          |  ← older messages as
+        |   |    Player: said X             |     system-role, facts
+        |   |    Alice: did Y, said Z       |     only, no style
+        |   +-------------------------------+
+        |   | 4. Last 4 messages            |  ← originals as
+        |   |    (user/assistant roles)     |     user/assistant
         |   +-------------------------------+
         |
         v
-+------------------------+
-| Semantic Deduplication |  Compare AI msgs by
-+------------------------+  n-gram overlap + structure
-        |                    Remove similar, keep latest
-        v
-+------------------------+
-| Variation State        |  JSON block listing
-| Injection              |  detected patterns:
-+------------------------+  openers, endings, lengths
-        |                    Injected before last
-        v                    user message
 +------------------+
 | API call → Reply |  frequency_penalty: 0.45
 +------------------+  presence_penalty:  0.35
         |
         v
++------------------+
+| Condense reply   |  Cheap API call (~200 tokens)
++------------------+  Extract: what happened,
+        |              what was said, decisions.
+        |              Third person, no style.
+        v
+  Store condensed version alongside original
+  (user sees original, API sees condensed)
+        |
+        v
 +----------------------+
-| Summarize if needed  |  Every ~20 new messages
+| Summarize if needed  |  Every ~30 new messages
 +----------------------+
         |
         v
       Done
 ```
 
-### The 4 Layers
-
-| Layer | Type | When | Cost |
-|-------|------|------|------|
-| **1. API penalties** | `frequency_penalty: 0.45`, `presence_penalty: 0.35` | Always | Zero — API parameter |
-| **2. Semantic dedup** | N-gram Jaccard + structural similarity → remove duplicates from context | Always (≥3 AI msgs) | Zero — local heuristic |
-| **3. Variation state** | System message listing detected patterns (openers, endings, lengths) | When patterns found | Zero — local analysis |
-| **4. Primacy bias** | Anti-repetition preamble prepended to system prompt | Always | Zero — string concat |
-
-### Similarity Detection
-
-Each pair of AI messages is compared using a composite score:
-
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| N-gram overlap | 2x | Bigram Jaccard similarity |
-| Length match | 1x | Within ±25% character count |
-| Sentence count | 1x | Same number of sentences |
-| Ending pattern | 1x each | Both end with *action* or "?" |
-| Opening word | 1x | Same first word |
-
-If composite score ≥ 0.4 → earlier message removed from context (with its
-preceding user message, to keep pairing clean).
-
 ### Why This Works
 
-The core problem: LLMs are autoregressive. If the context contains
-messages with the same structure, the model copies that structure.
+The core problem: LLMs copy style from their own previous messages
+in the context (context poisoning). Telling the model "don't repeat"
+loses to 10 concrete examples of the same pattern.
 
-This architecture attacks the root cause at every level:
-- **Deduplication** — repetitive messages are removed, not just rephrased
-- **Variation state** — explicit tracking of what patterns to avoid
-- **Primacy bias** — anti-repetition instruction at the top of context (models attend most to first/last 10%)
-- **API penalties** — token-level diversity pressure
-- **Summary** — older messages compressed into plot, not style
+Per-message condensation attacks the root cause:
+- **No style to copy** — older messages are bare facts, not prose
+- **Concrete context** — condensed messages preserve what happened
+- **System role** — model treats condensed history as reference, not as
+  examples to emulate
+- **Original window** — last 4 messages keep tone continuity
+- **API penalties** — complementary token-level diversity pressure
 
 ## Security Notice
 

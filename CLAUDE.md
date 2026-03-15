@@ -59,15 +59,16 @@ chat-quest/
 #### ai-engine.js
 - AI чат через OpenAI/Grok API
 - Токен-бюджет для контекста (DEFAULT_HISTORY_TOKEN_BUDGET=4000)
-- Суммаризация старых сообщений каждые ~20 сообщений (SUMMARY_TRIGGER=30, INTERVAL=20)
-- Последние 4 сообщения остаются дословно (RECENT_MESSAGES_KEEP=4)
-- 4-уровневая анти-репетиционная архитектура (без доп. API-вызовов):
-  1. API penalties (frequency_penalty=0.45, presence_penalty=0.35)
-  2. Семантическая дедупликация (_deduplicateContext — n-gram Jaccard + структурное сходство)
-  3. Variation state injection (_buildVariationState — JSON-блок с обнаруженными паттернами)
-  4. Primacy bias (_buildPreamble — анти-репетиционная преамбула в начале system prompt)
-- _similarity() — композитная оценка сходства двух сообщений (0-1)
-- _analyzeMessage() — извлечение структурных характеристик (n-grams, endings, openers)
+- Per-message condensation: каждый ответ персонажа сжимается до сути (~200 токенов API-вызов)
+  - _condenseMessage() — сжатие в 1-2 предложения, третье лицо, без стиля
+  - Сжатая версия хранится в message.condensed, оригинал остаётся в message.text
+  - Пользователь видит оригинал, API получает сжатую версию для старых сообщений
+- _buildContextMessages() — сборка контекста:
+  1. System prompt
+  2. Summary (для очень старых сообщений, SUMMARY_TRIGGER=50, INTERVAL=30)
+  3. Сжатые сообщения как system-role (без стилистического заражения)
+  4. Последние 4 сообщения как user/assistant оригиналы (RECENT_MESSAGES_KEEP=4)
+- API penalties (frequency_penalty=0.45, presence_penalty=0.35, только OpenAI)
 
 #### storage.js
 - Сохранение/загрузка сценариев
