@@ -5,7 +5,7 @@
  * Поддерживает токен-бюджет, суммаризацию и анти-репетиционную архитектуру
  *
  * Anti-repetition architecture:
- * 1. API penalties (frequency_penalty, presence_penalty) — baseline token-level defense
+ * 1. API penalties (frequency_penalty, presence_penalty) — baseline token-level defense (OpenAI only; skipped for providers that don't support them)
  * 2. Semantic deduplication — structurally similar AI messages removed from context
  * 3. Variation state injection — explicit JSON block tracking patterns to avoid
  * 4. Primacy bias — anti-repetition preamble at the top of system prompt
@@ -297,6 +297,19 @@ export class AiEngine {
      * Строит anti-repetition preamble для начала system prompt (primacy bias)
      * @returns {string}
      */
+    /**
+     * Возвращает объект с penalties для API-запроса.
+     * Grok и некоторые другие провайдеры не поддерживают эти параметры.
+     * @returns {Object}
+     */
+    _getPenalties() {
+        if (this.provider === 'grok') return {};
+        return {
+            frequency_penalty: FREQUENCY_PENALTY,
+            presence_penalty: PRESENCE_PENALTY
+        };
+    }
+
     _buildPreamble() {
         const lang = this._detectLanguage(this.systemPrompt);
         if (lang === 'ru') {
@@ -378,8 +391,7 @@ export class AiEngine {
             body: JSON.stringify({
                 model: this.model,
                 messages: apiMessages,
-                frequency_penalty: FREQUENCY_PENALTY,
-                presence_penalty: PRESENCE_PENALTY
+                ...this._getPenalties()
             })
         });
 
