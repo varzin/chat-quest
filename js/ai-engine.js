@@ -12,6 +12,8 @@
  * 5. Rolling summary — fallback for very old messages beyond token budget
  */
 
+import { selectArchetype, getDirective } from './template-director.js';
+
 const ENDPOINTS = {
     openai: 'https://api.openai.com/v1/chat/completions',
     grok: 'https://api.x.ai/v1/chat/completions'
@@ -61,6 +63,8 @@ export class AiEngine {
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
         this._pendingCondensed = null;
+        this._pendingArchetype = null;
+        this.useDirector = true;
     }
 
     /**
@@ -208,12 +212,17 @@ export class AiEngine {
             });
         }
 
-        // 5. Динамические напоминания — между предпоследним и последним сообщением
-        const reminderText = this._buildReminder(result);
-        if (reminderText) {
-            // Вставляем за 2 позиции до конца (между msg[-2] и msg[-1])
-            const insertIdx = Math.max(1, result.length - 2);
-            result.splice(insertIdx, 0, { role: 'system', content: reminderText });
+        // 5. Директива архетипа (template director) — перед последним сообщением
+        const archetypeDirective = this._buildArchetypeDirective();
+        if (archetypeDirective) {
+            result.push({ role: 'system', content: archetypeDirective });
+        } else {
+            // Фолбэк: динамические напоминания, если директор не активен
+            const reminderText = this._buildReminder(result);
+            if (reminderText) {
+                const insertIdx = Math.max(1, result.length - 2);
+                result.splice(insertIdx, 0, { role: 'system', content: reminderText });
+            }
         }
 
         return result;
@@ -253,6 +262,46 @@ export class AiEngine {
         }
 
         return issues.join(' ');
+    }
+
+    /**
+     * Собирает директиву архетипа для template director.
+     * Активен только для моделей grok-*-mini (маленькие модели).
+     * @returns {string|null}
+     */
+    _buildArchetypeDirective() {
+        if (!this._useTemplateDirector()) return null;
+
+        const lastUserMsg = this._getLastUserMessage();
+        if (!lastUserMsg) return null;
+
+        const archetype = selectArchetype(this.displayedMessages, lastUserMsg);
+        this._pendingArchetype = archetype;
+
+        const lang = this._detectLanguage(lastUserMsg);
+        return getDirective(archetype, lang);
+    }
+
+    /**
+     * Проверяет, нужно ли использовать template director.
+     * Включается для моделей с "mini" в названии.
+     * @returns {boolean}
+     */
+    _useTemplateDirector() {
+        return this.useDirector;
+    }
+
+    /**
+     * Возвращает текст последнего сообщения пользователя.
+     * @returns {string|null}
+     */
+    _getLastUserMessage() {
+        for (let i = this.displayedMessages.length - 1; i >= 0; i--) {
+            if (this.displayedMessages[i].isPlayer) {
+                return this.displayedMessages[i].text;
+            }
+        }
+        return null;
     }
 
     /**
@@ -394,9 +443,15 @@ export class AiEngine {
     }
 
     addMessage(message) {
-        if (!message.isPlayer && this._pendingCondensed) {
-            message.condensed = this._pendingCondensed;
-            this._pendingCondensed = null;
+        if (!message.isPlayer) {
+            if (this._pendingCondensed) {
+                message.condensed = this._pendingCondensed;
+                this._pendingCondensed = null;
+            }
+            if (this._pendingArchetype) {
+                message.archetype = this._pendingArchetype;
+                this._pendingArchetype = null;
+            }
         }
         this.displayedMessages.push(message);
     }
@@ -448,6 +503,7 @@ export class AiEngine {
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
         this._pendingCondensed = null;
+        this._pendingArchetype = null;
     }
 }
 

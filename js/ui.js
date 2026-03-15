@@ -50,6 +50,7 @@ class UIController {
             settingsTypingMax: document.getElementById('settings-typing-max'),
             settingsLanguage: document.getElementById('settings-language'),
             btnClearData: document.getElementById('btn-clear-data'),
+            settingsDirector: document.getElementById('settings-director'),
 
             // API Keys
             apiKeyOpenai: document.getElementById('api-key-openai'),
@@ -75,6 +76,7 @@ class UIController {
             aiChatTitle: document.getElementById('ai-chat-title'),
             aiChatCharacter: document.getElementById('ai-chat-character'),
             aiChatModel: document.getElementById('ai-chat-model'),
+            aiChatDirector: document.getElementById('ai-chat-director'),
             aiChatStart: document.getElementById('ai-chat-start'),
             aiChatCancel: document.getElementById('ai-chat-cancel'),
             aiChatFixSettings: document.getElementById('ai-chat-fix-settings'),
@@ -103,6 +105,7 @@ class UIController {
             modelPickerClose: document.getElementById('model-picker-close'),
             modelPickerCancel: document.getElementById('model-picker-cancel'),
             modelPickerApply: document.getElementById('model-picker-apply'),
+            modelPickerDirector: document.getElementById('model-picker-director'),
 
             // Confirm Modal
             confirmModal: document.getElementById('confirm-modal'),
@@ -126,6 +129,7 @@ class UIController {
             onTypingDelayChange: null,
             onLanguageChange: null,
             onClearData: null,
+            onDirectorChange: null,
             onApiKeySave: null,
             onCharacterSave: null,
             onCharacterDelete: null,
@@ -209,7 +213,8 @@ class UIController {
             const value = this.elements.modelPickerSelect.value;
             if (value) {
                 const [provider, model] = value.split(':');
-                this.callbacks.onChangeModel?.(provider, model);
+                const useDirector = this.elements.modelPickerDirector.checked;
+                this.callbacks.onChangeModel?.(provider, model, useDirector);
             }
             this._closeModelPicker();
         });
@@ -300,6 +305,9 @@ class UIController {
         this.elements.btnClearData.addEventListener('click', () => {
             this.callbacks.onClearData?.();
         });
+        this.elements.settingsDirector.addEventListener('change', (e) => {
+            this.callbacks.onDirectorChange?.(e.target.checked);
+        });
     }
 
     _bindApiKeyEvents() {
@@ -387,7 +395,8 @@ class UIController {
             const modelValue = this.elements.aiChatModel.value; // "provider:model"
             if (!charId || !modelValue) return;
             const [provider, model] = modelValue.split(':');
-            this.callbacks.onStartAiChat?.(charId, provider, model, title);
+            const useDirector = this.elements.aiChatDirector.checked;
+            this.callbacks.onStartAiChat?.(charId, provider, model, title, useDirector);
             this.elements.aiChatTitle.value = '';
             this.closeEditor();
         });
@@ -648,6 +657,10 @@ class UIController {
 
     _openModelPicker() {
         this._populateModelPicker();
+        // Sync director toggle with settings toggle
+        if (this.elements.settingsDirector && this.elements.modelPickerDirector) {
+            this.elements.modelPickerDirector.checked = this.elements.settingsDirector.checked;
+        }
         this.elements.modelPickerModal.hidden = false;
         lucide.createIcons();
     }
@@ -915,6 +928,22 @@ class UIController {
         if (this.elements.settingsTypingMax) {
             this.elements.settingsTypingMax.value = maxDelay;
             this._updateSliderVisual('settings-typing-max', maxDelay, 400, 5000);
+        }
+    }
+
+    /**
+     * Устанавливает состояние галочки директора
+     * @param {boolean} enabled
+     */
+    setDirector(enabled) {
+        if (this.elements.settingsDirector) {
+            this.elements.settingsDirector.checked = enabled;
+        }
+        if (this.elements.modelPickerDirector) {
+            this.elements.modelPickerDirector.checked = enabled;
+        }
+        if (this.elements.aiChatDirector) {
+            this.elements.aiChatDirector.checked = enabled;
         }
     }
 

@@ -66,6 +66,7 @@ class ChatQuestApp {
         this.ui.setLanguage(getLanguage());
         this.ui.setTheme(settings.theme || 'default');
         this.ui.setTypingDelays(settings.typingMinDelay || 400, settings.typingMaxDelay || 1600);
+        this.ui.setDirector(settings.useDirector !== false);
 
         // Загружаем API ключи и персонажей
         this.ui.setApiKeys(storage.getApiKeys());
@@ -177,6 +178,20 @@ class ChatQuestApp {
             }
         });
 
+        this.ui.on('onDirectorChange', (useDirector) => {
+            if (this.aiEngine) {
+                this.aiEngine.useDirector = useDirector;
+            }
+            if (this.currentAiChatId) {
+                const chatData = storage.getAiChat(this.currentAiChatId);
+                if (chatData) {
+                    chatData.useDirector = useDirector;
+                    storage.saveAiChat(this.currentAiChatId, chatData);
+                }
+            }
+            storage.saveSettings({ useDirector });
+        });
+
         this.ui.on('onApiKeySave', (provider, key) => {
             storage.saveApiKey(provider, key);
         });
@@ -209,8 +224,8 @@ class ChatQuestApp {
     }
 
     _setupAiChatCallbacks() {
-        this.ui.on('onStartAiChat', (characterId, provider, model, title) => {
-            this._startNewAiChat(characterId, provider, model, title);
+        this.ui.on('onStartAiChat', (characterId, provider, model, title, useDirector) => {
+            this._startNewAiChat(characterId, provider, model, title, useDirector);
         });
 
         this.ui.on('onAiChatSelect', (id) => this._loadAiChat(id));
@@ -232,8 +247,8 @@ class ChatQuestApp {
 
         this.ui.on('onSendMessage', (text) => this._handleSendMessage(text));
 
-        this.ui.on('onChangeModel', (provider, model) => {
-            this._changeAiChatModel(provider, model);
+        this.ui.on('onChangeModel', (provider, model, useDirector) => {
+            this._changeAiChatModel(provider, model, useDirector);
         });
 
         this.ui.on('onEditCharacter', () => {
@@ -513,7 +528,7 @@ class ChatQuestApp {
     /**
      * Создаёт и загружает новый AI чат
      */
-    _startNewAiChat(characterId, provider, model, title) {
+    _startNewAiChat(characterId, provider, model, title, useDirector = true) {
         const characters = storage.getCharacters();
         const character = characters.find(c => c.id === characterId);
         if (!character) return;
@@ -534,6 +549,7 @@ class ChatQuestApp {
             apiKey,
             globalSettings: settings
         });
+        this.aiEngine.useDirector = useDirector;
 
         this.engine = null;
         this.currentMode = MODE.AI_CHAT;
@@ -548,6 +564,7 @@ class ChatQuestApp {
             characterName: character.name,
             provider,
             model,
+            useDirector,
             messages: []
         });
         storage.setCurrentItem({ type: MODE.AI_CHAT, id });
@@ -594,6 +611,9 @@ class ChatQuestApp {
             apiKey,
             globalSettings: settings
         });
+        if (chatData.useDirector !== undefined) {
+            this.aiEngine.useDirector = chatData.useDirector;
+        }
 
         this.engine = null;
         this.currentMode = MODE.AI_CHAT;
@@ -676,7 +696,7 @@ class ChatQuestApp {
         }
     }
 
-    _changeAiChatModel(provider, model) {
+    _changeAiChatModel(provider, model, useDirector) {
         if (!this.aiEngine || !this.currentAiChatId) return;
 
         const apiKeys = storage.getApiKeys();
@@ -686,11 +706,15 @@ class ChatQuestApp {
         this.aiEngine.provider = provider;
         this.aiEngine.model = model;
         this.aiEngine.apiKey = apiKey;
+        if (useDirector !== undefined) {
+            this.aiEngine.useDirector = useDirector;
+        }
 
         const chatData = storage.getAiChat(this.currentAiChatId);
         if (chatData) {
             chatData.provider = provider;
             chatData.model = model;
+            chatData.useDirector = this.aiEngine.useDirector;
             storage.saveAiChat(this.currentAiChatId, chatData);
         }
 

@@ -384,55 +384,35 @@ describe('AiEngine', () => {
         });
     });
 
-    describe('_buildReminder - dynamic context injection', () => {
-        it('should inject NO_QUESTIONS reminder when last 2+ AI messages end with ?', () => {
+    describe('template director integration', () => {
+        it('should inject archetype directive into context', () => {
             const engine = createEngine();
             engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
-            engine.addMessage({ speaker: 'char1', text: 'Hello, how are you?', isPlayer: false });
-            engine.addMessage({ speaker: 'player', text: 'Fine', isPlayer: true });
-            engine.addMessage({ speaker: 'char1', text: 'What do you do?', isPlayer: false });
-            engine.addMessage({ speaker: 'player', text: 'Work', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Hello there', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'How are you?', isPlayer: true });
 
             const messages = engine._buildContextMessages();
-            const reminders = messages.filter(m => m.role === 'system' && m.content !== 'You are Alice');
-
-            const hasQuestionReminder = reminders.some(m =>
-                m.content.includes('вопрос') || m.content.includes('question'));
-            assert.ok(hasQuestionReminder, 'Should inject question reminder');
-        });
-
-        it('should inject VARY_LENGTH when messages are similar length', () => {
-            const engine = createEngine();
-            // 3 AI messages of similar length (~50 chars each)
-            engine.addMessage({ speaker: 'char1', text: 'This is a message that is about fifty chars long.', isPlayer: false });
-            engine.addMessage({ speaker: 'player', text: 'Ok', isPlayer: true });
-            engine.addMessage({ speaker: 'char1', text: 'Here is another one that is roughly same len.', isPlayer: false });
-            engine.addMessage({ speaker: 'player', text: 'Sure', isPlayer: true });
-            engine.addMessage({ speaker: 'char1', text: 'And yet another message of similar character.', isPlayer: false });
-            engine.addMessage({ speaker: 'player', text: 'Right', isPlayer: true });
-
-            const messages = engine._buildContextMessages();
-            const reminders = messages.filter(m =>
-                m.role === 'system' && (m.content.includes('длину') || m.content.includes('length')));
-            assert.ok(reminders.length > 0, 'Should inject length variation reminder');
-        });
-
-        it('should only inject static reminder when messages are varied', () => {
-            const engine = createEngine();
-            engine.addMessage({ speaker: 'char1', text: 'Hey.', isPlayer: false });
-            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
-            engine.addMessage({ speaker: 'char1', text: 'I was thinking we should go to that place downtown, the one with the rooftop terrace.', isPlayer: false });
-            engine.addMessage({ speaker: 'player', text: 'Sure', isPlayer: true });
-
-            const messages = engine._buildContextMessages();
-            const reminderMsgs = messages.filter(m =>
+            const directives = messages.filter(m =>
                 m.role === 'system' && m.content !== 'You are Alice');
-            // Should have only the static NO_QUESTIONS reminder
-            assert.equal(reminderMsgs.length, 1);
-            assert.ok(
-                reminderMsgs[0].content.includes('question') || reminderMsgs[0].content.includes('вопрос'),
-                'Should contain static no-questions reminder'
-            );
+            assert.ok(directives.length > 0, 'Should inject archetype directive');
+        });
+
+        it('should store archetype on AI message via addMessage', () => {
+            const engine = createEngine();
+            engine._pendingArchetype = 'STORY';
+            engine.addMessage({ speaker: 'char1', text: 'Once upon a time...', isPlayer: false });
+
+            assert.equal(engine.displayedMessages[0].archetype, 'STORY');
+            assert.equal(engine._pendingArchetype, null);
+        });
+
+        it('should not store archetype on player message', () => {
+            const engine = createEngine();
+            engine._pendingArchetype = 'STORY';
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+
+            assert.equal(engine.displayedMessages[0].archetype, undefined);
+            assert.equal(engine._pendingArchetype, 'STORY');
         });
     });
 
@@ -467,9 +447,11 @@ describe('AiEngine', () => {
             assert.equal(mainReq.messages[0].role, 'system');
             // With tight budget, condensed block should be truncated
             // but last 4 messages should still appear as originals
-            const lastMsg = mainReq.messages[mainReq.messages.length - 1];
+            // Last non-system message should be an original (director may add system at end)
+            const nonSystemMsgs = mainReq.messages.filter(m => m.role !== 'system');
+            const lastMsg = nonSystemMsgs[nonSystemMsgs.length - 1];
             assert.ok(lastMsg.role === 'user' || lastMsg.role === 'assistant',
-                'Last message should be an original (user or assistant role)');
+                'Last non-system message should be an original');
         });
     });
 

@@ -208,6 +208,14 @@
                         </div>
                         <p class="settings-item__caption" data-i18n="modelPriceHint">Цена: ввод / вывод за 1M токенов, USD</p>
                     </div>
+                    <div class="settings-item settings-item--row">
+                        <label class="settings-item__label" for="ai-chat-director" data-i18n="directorToggle">Директор ответов</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="ai-chat-director" checked>
+                            <span class="toggle__slider"></span>
+                        </label>
+                    </div>
+                    <p class="settings-item__caption" data-i18n="directorHint">Управляет структурой ответа: длина, тип, инициатива. Рекомендуется для всех моделей.</p>
                 </div>
                 <div class="modal__footer" id="ai-chat-footer">
                     <button class="modal__btn modal__btn--secondary" id="ai-chat-cancel" data-i18n="cancel">Отмена</button>
@@ -385,6 +393,16 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Director Toggle -->
+                    <div class="settings-item settings-item--row">
+                        <label class="settings-item__label" for="settings-director" data-i18n="directorToggle">Директор ответов</label>
+                        <label class="toggle">
+                            <input type="checkbox" id="settings-director" checked>
+                            <span class="toggle__slider"></span>
+                        </label>
+                    </div>
+                    <p class="settings-item__caption" data-i18n="directorHint">Управляет структурой ответа: длина, тип, инициатива. Рекомендуется для всех моделей.</p>
                 </div>
 
                 <!-- Tab: Characters -->
@@ -433,6 +451,14 @@
                         <i class="language-selector__icon" data-lucide="chevron-down"></i>
                     </div>
                 </div>
+                <div class="settings-item settings-item--row">
+                    <label class="settings-item__label" for="model-picker-director" data-i18n="directorToggle">Директор ответов</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="model-picker-director" checked>
+                        <span class="toggle__slider"></span>
+                    </label>
+                </div>
+                <p class="settings-item__caption" data-i18n="directorHint">Управляет структурой ответа: длина, тип, инициатива. Рекомендуется для всех моделей.</p>
             </div>
             <div class="modal__footer">
                 <button class="modal__btn modal__btn--secondary" id="model-picker-cancel" data-i18n="cancel">Отмена</button>

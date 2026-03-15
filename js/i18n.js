@@ -84,6 +84,8 @@ const translations = {
         chatSettings: 'Настройки чата',
         resetChat: 'Сбросить чат',
         changeModel: 'Сменить модель',
+        directorToggle: 'Директор ответов',
+        directorHint: 'Управляет структурой ответа: длина, тип, инициатива. Рекомендуется для всех моделей.',
         editChatCharacter: 'Редактировать персонажа',
 
         // AI Chat Setup
@@ -182,6 +184,8 @@ const translations = {
         chatSettings: 'Chat settings',
         resetChat: 'Reset chat',
         changeModel: 'Change model',
+        directorToggle: 'Response director',
+        directorHint: 'Controls response structure: length, type, initiative. Recommended for all models.',
         editChatCharacter: 'Edit character',
 
         // AI Chat Setup

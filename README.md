@@ -61,6 +61,10 @@ User sends message
         |   | 4. Last 4 messages            |  ← originals as
         |   |    (user/assistant roles)     |     user/assistant
         |   +-------------------------------+
+        |   | 5. Template Director          |  ← archetype directive
+        |   |    (if enabled)               |     e.g. "SHORT_REACTION:
+        |   |                               |     1 sentence, no question"
+        |   +-------------------------------+
         |
         v
 +------------------+
@@ -99,6 +103,10 @@ Per-message condensation attacks the root cause:
   examples to emulate
 - **Original window** — last 4 messages keep tone continuity
 - **API penalties** — complementary token-level diversity pressure
+- **Template Director** — selects response archetype (SHORT_REACTION,
+  STORY, INITIATIVE, OBSERVATION, OPINION, TEASE) based on conversation
+  state. Model executes the archetype instead of deciding structure itself.
+  Toggleable via UI.
 
 ## Security Notice
 

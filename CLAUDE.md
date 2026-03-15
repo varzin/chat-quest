@@ -68,6 +68,8 @@ chat-quest/
   2. Summary (для очень старых сообщений, SUMMARY_TRIGGER=50, INTERVAL=30)
   3. Сжатые сообщения как system-role (без стилистического заражения)
   4. Последние 4 сообщения как user/assistant оригиналы (RECENT_MESSAGES_KEEP=4)
+  5. Директива Template Director (архетип ответа)
+- Template Director (template-director.js): выбирает архетип ответа (SHORT_REACTION, STORY, INITIATIVE, OBSERVATION, OPINION, TEASE) на основе контекста. Включается галочкой в UI (useDirector). По умолчанию включён.
 - API penalties (frequency_penalty=0.45, presence_penalty=0.35, только OpenAI)
 
 #### storage.js
