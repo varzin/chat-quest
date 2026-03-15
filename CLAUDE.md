@@ -61,11 +61,13 @@ chat-quest/
 - Токен-бюджет для контекста (DEFAULT_HISTORY_TOKEN_BUDGET=4000)
 - Суммаризация старых сообщений каждые ~20 сообщений (SUMMARY_TRIGGER=30, INTERVAL=20)
 - Последние 4 сообщения остаются дословно (RECENT_MESSAGES_KEEP=4)
-- Детекция структурных паттернов в ответах персонажа (_detectPattern — эвристика без API, возвращает {detected, signals})
-- Перефразирование при обнаружении паттерна (_rephrasePatternMessages — дешёвый API-вызов)
-- Shadow copies (_rephrasedMap) — перефразированные тексты сохраняются и используются в будущих контекстах
-- Анти-репетиционная директива (_buildAntiRepetitionDirective) — системное сообщение с описанием конкретных паттернов
-- Подмена только в контексте API, пользователь видит оригиналы
+- 4-уровневая анти-репетиционная архитектура (без доп. API-вызовов):
+  1. API penalties (frequency_penalty=0.45, presence_penalty=0.35)
+  2. Семантическая дедупликация (_deduplicateContext — n-gram Jaccard + структурное сходство)
+  3. Variation state injection (_buildVariationState — JSON-блок с обнаруженными паттернами)
+  4. Primacy bias (_buildPreamble — анти-репетиционная преамбула в начале system prompt)
+- _similarity() — композитная оценка сходства двух сообщений (0-1)
+- _analyzeMessage() — извлечение структурных характеристик (n-grams, endings, openers)
 
 #### storage.js
 - Сохранение/загрузка сценариев
