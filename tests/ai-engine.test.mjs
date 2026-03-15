@@ -319,7 +319,10 @@ describe('AiEngine', () => {
             engine.addMessage({ speaker: 'player', text: 'How so?', isPlayer: true });
             engine.addMessage({ speaker: 'char1', text: 'Hard to explain but it felt really right. *pauses briefly*', isPlayer: false });
 
-            assert.equal(engine._detectPattern(), true);
+            const result = engine._detectPattern();
+            assert.equal(result.detected, true);
+            assert.ok(result.signals.length >= 3, 'Should have at least 3 signals');
+            assert.ok(result.signals.includes('all_end_with_action'));
         });
 
         it('should not detect pattern when messages vary', () => {
@@ -332,16 +335,16 @@ describe('AiEngine', () => {
             engine.addMessage({ speaker: 'player', text: 'Wait', isPlayer: true });
             engine.addMessage({ speaker: 'char1', text: 'Hmm?', isPlayer: false });
 
-            assert.equal(engine._detectPattern(), false);
+            assert.equal(engine._detectPattern().detected, false);
         });
 
-        it('should return false when fewer than 3 AI messages', () => {
+        it('should return not detected when fewer than 3 AI messages', () => {
             const engine = createEngine();
             engine.addMessage({ speaker: 'char1', text: 'Hello there.', isPlayer: false });
             engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
             engine.addMessage({ speaker: 'char1', text: 'How are you?', isPlayer: false });
 
-            assert.equal(engine._detectPattern(), false);
+            assert.equal(engine._detectPattern().detected, false);
         });
     });
 
@@ -394,6 +397,129 @@ describe('AiEngine', () => {
 
             const result = await engine._rephrasePatternMessages(messages);
             assert.equal(result[1].content, 'Original');
+        });
+    });
+
+    describe('anti-repetition directive', () => {
+        it('should inject directive when pattern is detected', async () => {
+            // Mock fetch: rephrase calls return numbered rephrased, main calls return reply
+            global.fetch = async (_url, options) => {
+                const body = JSON.parse(options.body);
+                if (body.messages[0].content.includes('Rephrase')) {
+                    const aiCount = body.messages[1].content.split('\n').length;
+                    const lines = Array.from({ length: aiCount }, (_, i) => `${i + 1}. Rephrased ${i + 1}`).join('\n');
+                    return { ok: true, json: async () => ({ choices: [{ message: { content: lines } }] }) };
+                }
+                lastRequestBody = body;
+                return { ok: true, json: async () => ({ choices: [{ message: { content: 'Reply' } }] }) };
+            };
+
+            const engine = createEngine();
+            // Add messages that trigger pattern (similar length, end with *action*, same sentence count)
+            for (let i = 0; i < 5; i++) {
+                engine.addMessage({ speaker: 'char1', text: `О, это так интересно и замечательно, давай продолжим. *улыбается тепло*`, isPlayer: false });
+                engine.addMessage({ speaker: 'player', text: `Давай`, isPlayer: true });
+            }
+
+            await engine.sendMessage('Давай');
+
+            // Should have an anti-repetition system message
+            const systemMessages = lastRequestBody.messages.filter(m => m.role === 'system');
+            const directive = systemMessages.find(m => m.content.includes('ВАЖНО') || m.content.includes('IMPORTANT'));
+            assert.ok(directive, 'Should inject anti-repetition directive');
+        });
+
+        it('should build Russian directive for Russian messages', () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'char1', text: 'Привет, как дела? *улыбается*', isPlayer: false });
+            engine.addMessage({ speaker: 'char1', text: 'Отлично, рада слышать! *кивает*', isPlayer: false });
+            engine.addMessage({ speaker: 'char1', text: 'Здорово, давай продолжим! *смотрит*', isPlayer: false });
+
+            const directive = engine._buildAntiRepetitionDirective(['all_end_with_action', 'same_length', 'same_sentence_count']);
+            assert.ok(directive.includes('ВАЖНО'), 'Should be in Russian');
+            assert.ok(directive.includes('звёздочках'), 'Should mention asterisks pattern');
+        });
+
+        it('should build English directive for English messages', () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'char1', text: 'Hey, thats interesting. *smiles*', isPlayer: false });
+            engine.addMessage({ speaker: 'char1', text: 'Cool, lets continue then. *nods*', isPlayer: false });
+            engine.addMessage({ speaker: 'char1', text: 'Sure, I agree with that. *leans*', isPlayer: false });
+
+            const directive = engine._buildAntiRepetitionDirective(['all_end_with_action', 'same_opening']);
+            assert.ok(directive.includes('IMPORTANT'), 'Should be in English');
+        });
+    });
+
+    describe('shadow rephrased copies', () => {
+        it('should store rephrased texts in _rephrasedMap', async () => {
+            global.fetch = async (_url, options) => {
+                const body = JSON.parse(options.body);
+                if (body.messages[0].content.includes('Rephrase')) {
+                    return {
+                        ok: true,
+                        json: async () => ({
+                            choices: [{ message: { content: '1. Shadow first\n2. Shadow second' } }]
+                        })
+                    };
+                }
+                return { ok: true, json: async () => ({ choices: [{ message: { content: 'Reply' } }] }) };
+            };
+
+            const engine = createEngine();
+            const messages = [
+                { role: 'system', content: 'You are Alice' },
+                { role: 'user', content: 'Hi' },
+                { role: 'assistant', content: 'Original first' },
+                { role: 'user', content: 'Ok' },
+                { role: 'assistant', content: 'Original second' }
+            ];
+
+            // Add corresponding displayed messages
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Original first', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Ok', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Original second', isPlayer: false });
+
+            await engine._rephrasePatternMessages(messages);
+
+            assert.equal(engine._rephrasedMap.get(1), 'Shadow first');
+            assert.equal(engine._rephrasedMap.get(3), 'Shadow second');
+        });
+
+        it('should use shadow copies in context building', async () => {
+            const engine = createEngine();
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+            engine.addMessage({ speaker: 'char1', text: 'Original text', isPlayer: false });
+            engine.addMessage({ speaker: 'player', text: 'Ok', isPlayer: true });
+
+            // Set shadow copy for index 1
+            engine._rephrasedMap.set(1, 'Rephrased shadow text');
+
+            const ctx = engine._buildContextMessages();
+            const assistantMsg = ctx.find(m => m.role === 'assistant');
+            assert.equal(assistantMsg.content, 'Rephrased shadow text');
+        });
+
+        it('should persist shadow copies through save/restore', () => {
+            const engine = createEngine();
+            engine._rephrasedMap.set(1, 'Shadow text');
+            engine._rephrasedMap.set(3, 'Another shadow');
+
+            const state = engine.getState();
+            const engine2 = createEngine();
+            engine2.restore(state);
+
+            assert.equal(engine2._rephrasedMap.get(1), 'Shadow text');
+            assert.equal(engine2._rephrasedMap.get(3), 'Another shadow');
+        });
+
+        it('should clear shadow copies on reset', () => {
+            const engine = createEngine();
+            engine._rephrasedMap.set(1, 'Shadow');
+            engine.reset();
+
+            assert.equal(engine._rephrasedMap.size, 0);
         });
     });
 

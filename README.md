@@ -43,21 +43,9 @@ Two systems work together to keep responses fresh and context-aware.
 User sends message
         |
         v
-+-------------------+
-| Pattern Detection |  Scan last 4-5 AI messages
-+-------------------+  for structural repetition
-        |
-   +---------+
-   | Pattern | --YES--> Rephrase repeated messages
-   | found?  |          (cheap API call, ~200 tokens)
-   +---------+          Swap only in API context,
-        |               user still sees originals
-        NO
-        |
-        v
 +------------------------+
-| Build Context Messages |
-+------------------------+
+| Build Context Messages |  Uses shadow copies from
++------------------------+  _rephrasedMap if available
         |
         |   Assembles this array for the API:
         |
@@ -65,14 +53,24 @@ User sends message
         |   | 1. System prompt          |
         |   +---------------------------+
         |   | 2. Summary (if exists)    |
-        |   |    "They met at the cafe, |
-        |   |     discussed music..."   |
         |   +---------------------------+
-        |   | 3. Last 4 messages        |
-        |   |    (original or rephrased)|
+        |   | 3. Recent messages        |
+        |   |    (shadow or original)   |
         |   +---------------------------+
         |
         v
++-------------------+
+| Pattern Detection |  Scan last 4-5 AI messages
++-------------------+  for structural repetition
+        |
+   +---------+
+   | Pattern | --YES--> 1. Rephrase in context
+   | found?  |              (API call, ~200 tokens)
+   +---------+          2. Save shadow copies
+        |                   for future contexts
+        NO              3. Inject anti-repetition
+        |                   directive (system msg
+        v                   before last user msg)
 +------------------+
 | API call → Reply |
 +------------------+
@@ -91,16 +89,22 @@ User sends message
 
 Checks the last 4-5 AI messages for structural similarity:
 
-| Check                | Example trigger                         |
-|----------------------|-----------------------------------------|
-| Similar length       | All messages within ±20% character count|
-| Same sentence count  | All have exactly 3 sentences            |
-| Ending pattern       | All end with *italicized action*        |
-| Ending with question | All end with "?"                        |
-| Repeated openers     | All start with similar words            |
+| Check                | Signal name          | Example trigger                         |
+|----------------------|----------------------|-----------------------------------------|
+| Similar length       | `same_length`        | All messages within ±20% character count|
+| Same sentence count  | `same_sentence_count`| All have exactly 3 sentences            |
+| Ending pattern       | `all_end_with_action`| All end with *italicized action*        |
+| Ending with question | `all_end_with_question`| All end with "?"                      |
+| Repeated openers     | `same_opening`       | All start with similar words            |
 
-If 3+ checks match → pattern detected → messages get rephrased before
-being sent to the API.
+If 3+ checks match → pattern detected → three countermeasures activate:
+
+1. **Rephrasing** — assistant messages in context are rephrased via API
+2. **Shadow copies** — rephrased texts stored in `_rephrasedMap`, reused
+   in all future `_buildContextMessages` calls (user still sees originals)
+3. **Anti-repetition directive** — a system message injected before the
+   last user message, describing the specific detected patterns and
+   instructing the model to vary structure (in conversation language)
 
 ### Why This Works
 
@@ -108,9 +112,9 @@ The core problem: LLMs are autoregressive. If the context contains 10
 messages with the same structure, the model copies that structure.
 Telling it "don't repeat" in the prompt loses to 10 concrete examples.
 
-This architecture attacks the root cause:
-- **Short window** (4 messages instead of 10) — less material to copy
-- **Rephrasing** — even those 4 messages look structurally different
+This architecture attacks the root cause at three levels:
+- **Shadow copies** — the model never sees the original repetitive messages again
+- **Directive** — explicit instruction naming the exact patterns to avoid
 - **Summary** — older messages compressed into plot, not style
 
 ## Security Notice
