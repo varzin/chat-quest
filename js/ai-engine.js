@@ -40,6 +40,8 @@ export class AiEngine {
         this._summary = null;
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
+        /** @type {Map<number, string>} Shadow rephrased texts keyed by displayedMessages index */
+        this._rephrasedMap = new Map();
     }
 
     /**
@@ -78,11 +80,11 @@ export class AiEngine {
 
     /**
      * Эвристика: проверяет последние сообщения персонажа на структурное повторение
-     * @returns {boolean}
+     * @returns {{ detected: boolean, signals: string[] }}
      */
     _detectPattern() {
         const texts = this._getRecentAiTexts(PATTERN_CHECK_COUNT);
-        if (texts.length < 3) return false;
+        if (texts.length < 3) return { detected: false, signals: [] };
 
         const stats = texts.map(t => {
             const sentences = t.split(/[.!?…]+/).filter(s => s.trim().length > 0);
@@ -98,29 +100,29 @@ export class AiEngine {
             };
         });
 
-        let signals = 0;
+        const signals = [];
 
         // 1. Similar length (all within ±20% of median)
         const lengths = stats.map(s => s.len).sort((a, b) => a - b);
         const median = lengths[Math.floor(lengths.length / 2)];
         if (median > 0 && stats.every(s => Math.abs(s.len - median) / median < 0.2)) {
-            signals++;
+            signals.push('same_length');
         }
 
         // 2. Same sentence count
         const counts = new Set(stats.map(s => s.sentenceCount));
         if (counts.size === 1) {
-            signals++;
+            signals.push('same_sentence_count');
         }
 
         // 3. All end with italicized action
         if (stats.every(s => s.endsWithAction)) {
-            signals++;
+            signals.push('all_end_with_action');
         }
 
         // 4. All end with question
         if (stats.every(s => s.endsWithQuestion)) {
-            signals++;
+            signals.push('all_end_with_question');
         }
 
         // 5. Repeated opening words
@@ -129,10 +131,46 @@ export class AiEngine {
             firstWords.filter(w => w === b).length - firstWords.filter(w => w === a).length
         )[0];
         if (firstWords.filter(w => w === mostCommon).length >= Math.ceil(texts.length * 0.7)) {
-            signals++;
+            signals.push('same_opening');
         }
 
-        return signals >= PATTERN_THRESHOLD;
+        return { detected: signals.length >= PATTERN_THRESHOLD, signals };
+    }
+
+    /**
+     * Строит директиву для модели с описанием обнаруженных повторов
+     * @param {string[]} signals
+     * @returns {string}
+     */
+    _buildAntiRepetitionDirective(signals) {
+        const lang = this._detectLanguage(
+            this._getRecentAiTexts(3).join(' ')
+        );
+
+        const descriptions = {
+            same_length: lang === 'ru'
+                ? 'все сообщения одинаковой длины'
+                : 'all messages are the same length',
+            same_sentence_count: lang === 'ru'
+                ? 'одинаковое количество предложений'
+                : 'same number of sentences',
+            all_end_with_action: lang === 'ru'
+                ? 'все заканчиваются действием в *звёздочках*'
+                : 'all end with an action in *asterisks*',
+            all_end_with_question: lang === 'ru'
+                ? 'все заканчиваются вопросом'
+                : 'all end with a question',
+            same_opening: lang === 'ru'
+                ? 'все начинаются с одного и того же слова'
+                : 'all start with the same word'
+        };
+
+        const issues = signals.map(s => descriptions[s]).filter(Boolean).join('; ');
+
+        if (lang === 'ru') {
+            return `[ВАЖНО] Твои последние ответы стали шаблонными (${issues}). В следующем ответе ОБЯЗАТЕЛЬНО измени структуру: используй другую длину, другое начало, другой порядок элементов. Не используй *действия в звёздочках* если раньше ты их использовал постоянно. Будь непредсказуемым.`;
+        }
+        return `[IMPORTANT] Your recent replies have become formulaic (${issues}). In your next reply, you MUST change the structure: use a different length, different opening, different element order. Don't use *actions in asterisks* if you've been using them constantly. Be unpredictable.`;
     }
 
     /**
@@ -195,12 +233,27 @@ export class AiEngine {
 
             if (parsed.length !== aiMessages.length) return messages;
 
-            // Swap rephrased content back into messages array
+            // Swap rephrased content back into messages array + save shadow copies
             const result = [...messages];
             let aiIdx = 0;
+            // Map context assistant indices back to displayedMessages indices
+            const displayedAiIndices = [];
+            for (let i = 0; i < this.displayedMessages.length; i++) {
+                if (!this.displayedMessages[i].isPlayer) {
+                    displayedAiIndices.push(i);
+                }
+            }
+            // We only rephrased the assistant messages that were in the context
+            const contextAiCount = messages.filter(m => m.role === 'assistant').length;
+            const relevantDisplayedIndices = displayedAiIndices.slice(-contextAiCount);
+
             for (let i = 0; i < result.length; i++) {
                 if (result[i].role === 'assistant') {
                     result[i] = { ...result[i], content: parsed[aiIdx] };
+                    // Store as shadow copy
+                    if (aiIdx < relevantDisplayedIndices.length) {
+                        this._rephrasedMap.set(relevantDisplayedIndices[aiIdx], parsed[aiIdx]);
+                    }
                     aiIdx++;
                 }
             }
@@ -224,16 +277,17 @@ export class AiEngine {
             remaining -= this._estimateTokens(this._summary);
         }
 
-        // Заполняем с конца, пока есть бюджет
+        // Заполняем с конца, пока есть бюджет (используем shadow copies если есть)
         const selected = [];
         for (let i = this.displayedMessages.length - 1; i >= 0 && remaining > 0; i--) {
             const msg = this.displayedMessages[i];
-            const tokens = this._estimateTokens(msg.text);
+            const text = this._rephrasedMap.get(i) || msg.text;
+            const tokens = this._estimateTokens(text);
             if (tokens > remaining && selected.length > 0) break;
             remaining -= tokens;
             selected.unshift({
                 role: msg.isPlayer ? 'user' : 'assistant',
-                content: msg.text
+                content: text
             });
         }
 
@@ -261,9 +315,16 @@ export class AiEngine {
 
         let apiMessages = this._buildContextMessages();
 
-        // Pattern detection + rephrasing
-        if (this._detectPattern()) {
+        // Pattern detection + rephrasing + anti-repetition directive
+        const patternResult = this._detectPattern();
+        if (patternResult.detected) {
             apiMessages = await this._rephrasePatternMessages(apiMessages);
+            // Inject anti-repetition directive right before the last user message
+            const directive = this._buildAntiRepetitionDirective(patternResult.signals);
+            const lastUserIdx = apiMessages.findLastIndex(m => m.role === 'user');
+            if (lastUserIdx > 0) {
+                apiMessages.splice(lastUserIdx, 0, { role: 'system', content: directive });
+            }
         }
 
         const response = await fetch(endpoint, {
@@ -437,7 +498,8 @@ export class AiEngine {
             model: this.model,
             displayedMessages: [...this.displayedMessages],
             _summary: this._summary,
-            _summaryUpToIndex: this._summaryUpToIndex
+            _summaryUpToIndex: this._summaryUpToIndex,
+            _rephrasedMap: Array.from(this._rephrasedMap.entries())
         };
     }
 
@@ -447,6 +509,7 @@ export class AiEngine {
         }
         this._summary = state._summary || null;
         this._summaryUpToIndex = state._summaryUpToIndex || 0;
+        this._rephrasedMap = new Map(state._rephrasedMap || []);
     }
 
     reset() {
@@ -454,6 +517,7 @@ export class AiEngine {
         this._summary = null;
         this._summaryUpToIndex = 0;
         this._isSummarizing = false;
+        this._rephrasedMap = new Map();
     }
 }
 
