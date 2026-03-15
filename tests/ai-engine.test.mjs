@@ -117,8 +117,8 @@ describe('AiEngine', () => {
             assert.equal(lastRequestBody.model, 'grok-3-mini');
         });
 
-        it('should include frequency_penalty and presence_penalty', async () => {
-            const engine = createEngine();
+        it('should include frequency_penalty and presence_penalty for openai', async () => {
+            const engine = createEngine({ provider: 'openai' });
             engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
 
             await engine.sendMessage('Hi');
@@ -127,6 +127,18 @@ describe('AiEngine', () => {
                 'Should have positive frequency_penalty');
             assert.ok(lastRequestBody.presence_penalty > 0,
                 'Should have positive presence_penalty');
+        });
+
+        it('should NOT include penalties for grok provider', async () => {
+            const engine = createEngine({ provider: 'grok', model: 'grok-3-mini' });
+            engine.addMessage({ speaker: 'player', text: 'Hi', isPlayer: true });
+
+            await engine.sendMessage('Hi');
+
+            assert.equal(lastRequestBody.frequency_penalty, undefined,
+                'Should not send frequency_penalty for grok');
+            assert.equal(lastRequestBody.presence_penalty, undefined,
+                'Should not send presence_penalty for grok');
         });
     });
 
